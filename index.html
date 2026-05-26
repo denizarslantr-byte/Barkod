@@ -1,0 +1,2229 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Barkod Sayım</title>
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#0f1117">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://unpkg.com/@zxing/library@0.19.1/umd/index.min.js"></script>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap');
+:root{
+  --bg:#0f1117;--surface:#1a1d27;--surface2:#232636;--border:#2e3248;
+  --accent:#4ade80;--accent2:#22d3ee;--warn:#f59e0b;--danger:#f87171;
+  --purple:#a78bfa;--orange:#fb923c;
+  --text:#e2e8f0;--muted:#64748b;
+  --mono:'IBM Plex Mono',monospace;--sans:'IBM Plex Sans',sans-serif;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:var(--sans);background:var(--bg);color:var(--text);min-height:100vh;max-width:480px;margin:0 auto;}
+
+/* LOGIN */
+#loginScreen{position:fixed;inset:0;background:var(--bg);z-index:9999;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:32px 24px;max-width:480px;margin:0 auto;}
+#loginScreen.hidden{display:none;}
+.login-logo{width:72px;height:72px;background:var(--accent);border-radius:18px;display:flex;align-items:center;justify-content:center;font-size:36px;margin-bottom:20px;}
+.login-title{font-size:24px;font-weight:700;margin-bottom:6px;text-align:center;}
+.login-sub{font-size:13px;color:var(--muted);text-align:center;margin-bottom:24px;line-height:1.6;}
+.login-form{width:100%;max-width:320px;}
+.login-input{width:100%;background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:12px 14px;color:var(--text);font-size:15px;font-family:var(--sans);margin-bottom:10px;outline:none;}
+.login-input:focus{border-color:var(--accent);}
+.login-input::placeholder{color:var(--muted);}
+.login-btn{width:100%;background:var(--accent);color:#0f1117;border:none;border-radius:10px;padding:13px;font-size:15px;font-weight:700;cursor:pointer;font-family:var(--sans);}
+.login-error{color:var(--danger);font-size:13px;margin-top:8px;text-align:center;min-height:20px;}
+.pin-error{color:var(--danger);font-size:13px;margin-top:12px;text-align:center;min-height:20px;}
+.pin-hint{font-size:11px;color:var(--muted);margin-top:8px;text-align:center;}
+
+/* HEADER */
+.app-header{background:var(--surface);border-bottom:1px solid var(--border);padding:10px 14px;display:flex;align-items:center;gap:10px;position:sticky;top:0;z-index:100;}
+.app-logo{width:28px;height:28px;background:var(--accent);border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:14px;}
+.app-title{font-size:14px;font-weight:700;}
+.header-right{margin-left:auto;display:flex;align-items:center;gap:8px;}
+.conn-dot{width:8px;height:8px;border-radius:50%;background:var(--danger);}
+.conn-dot.on{background:var(--accent);box-shadow:0 0 5px var(--accent);}
+.logout-btn{background:none;border:1px solid var(--border);color:var(--muted);border-radius:5px;padding:3px 8px;font-size:10px;cursor:pointer;font-family:var(--sans);}
+
+/* HOME GRID */
+#page-home{padding:16px 12px;}
+.home-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;}
+.home-card{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:18px 8px 14px;display:flex;flex-direction:column;align-items:center;gap:8px;cursor:pointer;transition:all .15s;text-align:center;user-select:none;}
+.home-card:active{transform:scale(.94);}
+.home-card-icon{font-size:30px;line-height:1;}
+.home-card-label{font-size:11px;font-weight:700;}
+.home-card.c-sorgu{border-color:rgba(34,211,238,.3);} .home-card.c-sorgu .home-card-label{color:var(--accent2);}
+.home-card.c-sayim{border-color:rgba(74,222,128,.3);} .home-card.c-sayim .home-card-label{color:var(--accent);}
+.home-card.c-transfer{border-color:rgba(251,146,60,.3);} .home-card.c-transfer .home-card-label{color:var(--orange);}
+.home-card.c-depo{border-color:rgba(167,139,250,.3);} .home-card.c-depo .home-card-label{color:var(--purple);}
+.home-card.c-stok{border-color:rgba(245,158,11,.3);} .home-card.c-stok .home-card-label{color:var(--warn);}
+.home-card.c-baglan{border-color:rgba(248,113,113,.3);} .home-card.c-baglan .home-card-label{color:var(--danger);}
+.home-card.c-fiyat{border-color:rgba(52,211,153,.3);} .home-card.c-fiyat .home-card-label{color:#34d399;}
+.home-card.c-sepet{border-color:rgba(129,140,248,.3);} .home-card.c-sepet .home-card-label{color:#818cf8;}
+.home-card.c-ayarlar{border-color:rgba(156,163,175,.3);} .home-card.c-ayarlar .home-card-label{color:#9ca3af;}
+.home-card.hidden{display:none;}
+
+/* INNER PAGES */
+.inner-page{display:none;padding:13px;}
+.inner-page.active{display:block;}
+
+/* BACK */
+.back-row{display:flex;align-items:center;gap:8px;margin-bottom:12px;}
+.back-btn{background:var(--surface2);border:1px solid var(--border);color:var(--muted);border-radius:8px;padding:6px 12px;font-size:12px;font-weight:600;cursor:pointer;font-family:var(--sans);}
+.back-btn:hover{border-color:var(--accent);color:var(--accent);}
+.page-title{font-size:16px;font-weight:700;}
+
+/* CARD */
+.card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:13px;margin-bottom:10px;}
+.card-title{font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.8px;margin-bottom:10px;}
+
+/* BUTTONS */
+.btn{display:inline-flex;align-items:center;gap:5px;padding:9px 13px;border-radius:8px;border:none;font-size:13px;font-weight:600;cursor:pointer;transition:all .15s;font-family:var(--sans);}
+.btn-primary{background:var(--accent);color:#0f1117;}
+.btn-secondary{background:var(--surface2);color:var(--text);border:1px solid var(--border);}
+.btn-danger{background:transparent;color:var(--danger);border:1px solid var(--danger);}
+.btn-warn{background:transparent;color:var(--warn);border:1px solid var(--warn);}
+.btn-green{background:rgba(74,222,128,.15);color:var(--accent);border:1px solid rgba(74,222,128,.3);}
+.btn-blue{background:rgba(34,211,238,.12);color:var(--accent2);border:1px solid rgba(34,211,238,.3);}
+.btn-orange{background:rgba(251,146,60,.15);color:var(--orange);border:1px solid rgba(251,146,60,.3);}
+.btn-sm{padding:5px 9px;font-size:11px;border-radius:6px;}
+.btn-full{width:100%;justify-content:center;}
+
+/* INPUT */
+.input-label{font-size:11px;color:var(--muted);margin-bottom:5px;display:block;}
+.input{width:100%;background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:9px 11px;color:var(--text);font-size:14px;font-family:var(--sans);transition:border-color .2s;}
+.input:focus{outline:none;border-color:var(--accent);}
+.input::placeholder{color:var(--muted);}
+
+/* BADGE */
+.badge{display:inline-block;padding:2px 7px;border-radius:20px;font-size:10px;font-weight:600;font-family:var(--mono);}
+.badge-green{background:rgba(74,222,128,.15);color:var(--accent);}
+.badge-gray{background:var(--surface2);color:var(--muted);}
+
+/* DEPO LIST */
+.depo-item{display:flex;align-items:center;justify-content:space-between;padding:10px 12px;background:var(--bg);border:1px solid var(--border);border-radius:8px;margin-bottom:7px;cursor:pointer;transition:border-color .15s;}
+.depo-item:hover{border-color:var(--accent);}
+.depo-item.selected{border-color:var(--accent);background:rgba(74,222,128,.06);}
+.depo-name{font-size:13px;font-weight:600;}
+.depo-count{font-size:10px;color:var(--muted);font-family:var(--mono);}
+
+/* SAYIM / TRANSFER ITEMS */
+.sayim-item{background:var(--surface);border:1px solid var(--border);border-radius:12px;margin-bottom:10px;overflow:hidden;}
+.sayim-header{display:flex;align-items:center;justify-content:space-between;padding:10px 12px;background:var(--surface2);border-bottom:1px solid var(--border);}
+.sayim-title{font-size:13px;font-weight:600;}
+.sayim-meta{font-size:10px;color:var(--muted);font-family:var(--mono);}
+.sayim-actions{display:flex;gap:5px;}
+.sayim-body{padding:10px 12px;}
+
+/* BARKOD ROW */
+.barkod-row{display:flex;align-items:center;justify-content:space-between;padding:7px 0;border-bottom:1px solid var(--border);}
+.barkod-row:last-child{border-bottom:none;}
+.barkod-no{font-family:var(--mono);font-size:12px;color:var(--accent2);}
+.barkod-depo{font-size:10px;color:var(--muted);}
+.barkod-del{background:rgba(248,113,113,.12);border:1px solid rgba(248,113,113,.3);color:var(--danger);border-radius:5px;padding:4px 8px;font-size:11px;cursor:pointer;flex-shrink:0;margin-left:6px;}
+
+/* MODAL */
+.modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.8);z-index:200;align-items:flex-end;}
+.modal-overlay.open{display:flex;}
+.modal{background:var(--surface);border-radius:18px 18px 0 0;padding:14px 13px 22px;width:100%;max-width:480px;margin:0 auto;border-top:1px solid var(--border);animation:slideUp .2s ease;max-height:94vh;overflow-y:auto;}
+@keyframes slideUp{from{transform:translateY(100%)}to{transform:translateY(0)}}
+.modal-title{font-size:14px;font-weight:700;margin-bottom:11px;}
+.modal-close{float:right;background:var(--surface2);border:none;color:var(--muted);width:26px;height:26px;border-radius:50%;cursor:pointer;font-size:14px;display:flex;align-items:center;justify-content:center;}
+
+/* SCAN INPUT */
+.scan-input{flex:1;background:var(--surface);border:1px solid var(--border);border-radius:7px;padding:9px 10px;color:var(--text);font-size:15px;font-family:var(--mono);}
+.scan-input:focus{outline:none;border-color:var(--accent2);}
+
+/* CAMERA */
+#qr-reader-container,#qr-sorgu-container,#qr-transfer-container{width:100%;border-radius:8px;overflow:hidden;}
+.qr-wrap video{width:100%!important;height:auto!important;min-height:220px;max-height:290px;object-fit:cover;display:block;}
+.qr-wrap>div>div+div{display:none!important;}
+.qr-wrap span{display:none!important;}
+
+/* TOAST */
+.toast{position:fixed;bottom:18px;left:50%;transform:translateX(-50%);background:var(--accent);color:#0f1117;padding:8px 16px;border-radius:100px;font-size:12px;font-weight:600;z-index:9999;animation:fadeOut 2.6s ease forwards;white-space:nowrap;max-width:88vw;text-align:center;}
+.toast.error{background:var(--danger);color:white;}
+.toast.warn{background:var(--warn);color:#0f1117;}
+@keyframes fadeOut{0%{opacity:0;transform:translateX(-50%) translateY(6px)}12%{opacity:1;transform:translateX(-50%) translateY(0)}75%{opacity:1}100%{opacity:0}}
+
+/* STOK TABLE */
+.stok-table{width:100%;border-collapse:collapse;}
+.stok-table th{font-size:9px;color:var(--muted);text-transform:uppercase;padding:6px 8px;background:var(--surface2);text-align:left;font-weight:700;}
+.stok-table td{font-size:11px;padding:7px 8px;border-bottom:1px solid var(--border);vertical-align:middle;}
+.stok-table tr:last-child td{border-bottom:none;}
+.stok-table tr:nth-child(even) td{background:rgba(255,255,255,.02);}
+.td-barkod{font-family:var(--mono);color:var(--accent2);font-size:10px;}
+.td-depo{color:var(--accent);font-size:10px;}
+
+/* CONNECT CARD */
+.connect-card{background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:12px;margin-bottom:8px;}
+.connect-card.connected{border-color:rgba(74,222,128,.4);background:rgba(74,222,128,.04);}
+.connect-status{display:flex;align-items:center;gap:6px;font-size:12px;font-weight:600;margin-bottom:9px;}
+.dot-off{width:8px;height:8px;border-radius:50%;background:var(--danger);flex-shrink:0;}
+.dot-on{width:8px;height:8px;border-radius:50%;background:var(--accent);flex-shrink:0;box-shadow:0 0 5px var(--accent);}
+
+/* EDIT ROW */
+.edit-row{display:flex;align-items:center;gap:6px;padding:6px 0;border-bottom:1px solid var(--border);}
+.edit-row:last-child{border-bottom:none;}
+.edit-idx{font-size:10px;color:var(--muted);font-family:var(--mono);min-width:18px;}
+.edit-input{flex:1;background:var(--bg);border:1px solid var(--border);border-radius:5px;padding:5px 6px;color:var(--text);font-size:11px;font-family:var(--mono);}
+.edit-input:focus{outline:none;border-color:var(--accent2);}
+
+/* SHARE BTN */
+.share-btn{display:flex;align-items:center;gap:10px;padding:11px 13px;background:var(--bg);border:1px solid var(--border);border-radius:9px;margin-bottom:7px;cursor:pointer;width:100%;}
+.share-btn:hover{border-color:var(--accent);}
+</style>
+</head>
+<body>
+
+<!-- LOGIN: Kullanıcı Adı + Şifre -->
+<div id="loginScreen">
+  <div class="login-logo">📦</div>
+  <div class="login-title">Barkod Sayım</div>
+  <div class="login-sub">Kullanıcı adı ve şifrenizi girin</div>
+  <div class="login-form">
+    <input class="login-input" id="loginKullanici" placeholder="Kullanıcı adı" type="text" autocomplete="off" onkeydown="if(event.key==='Enter')document.getElementById('loginSifre').focus()">
+    <input class="login-input" id="loginSifre" placeholder="Şifre" type="password" onkeydown="if(event.key==='Enter')loginYap()">
+    <button class="login-btn" onclick="loginYap()">Giriş Yap</button>
+    <div class="login-error" id="loginError"></div>
+    <div class="pin-hint" style="margin-top:12px;">İlk kurulumdan sonra varsayılan şifreleri Ayarlar bölümünden değiştirin.</div>
+  </div>
+</div>
+
+<!-- HEADER -->
+<div class="app-header">
+  <div class="app-logo">📦</div>
+  <div>
+    <div class="app-title">Barkod Sayım</div>
+    <div style="font-size:10px;color:var(--muted);" id="headerKullanici"></div>
+  </div>
+  <div class="header-right">
+    <div class="conn-dot" id="connDot"></div>
+    <button class="logout-btn" onclick="cikis()">Çıkış</button>
+  </div>
+</div>
+
+<!-- HOME -->
+<div id="page-home" style="padding:14px 12px;">
+  <div class="home-grid" id="homeGrid">
+    <div class="home-card c-sorgu" id="card-sorgu" onclick="goPage('sorgu')">
+      <div class="home-card-icon">🔍</div>
+      <div class="home-card-label">Sorgu</div>
+    </div>
+    <div class="home-card c-sayim" id="card-sayim" onclick="goPage('sayim')">
+      <div class="home-card-icon">📋</div>
+      <div class="home-card-label">Sayım</div>
+    </div>
+    <div class="home-card c-transfer" id="card-transfer" onclick="goPage('transfer')">
+      <div class="home-card-icon">🔄</div>
+      <div class="home-card-label">Transfer</div>
+    </div>
+    <div class="home-card c-fiyat" id="card-fiyat" onclick="goPage('fiyat')">
+      <div class="home-card-icon">💰</div>
+      <div class="home-card-label">Fiyat Sorgu</div>
+    </div>
+    <div class="home-card c-sepet" id="card-sepet" onclick="goPage('sepet')">
+      <div class="home-card-icon">🛒</div>
+      <div class="home-card-label">Sepet</div>
+    </div>
+    <div class="home-card c-depo" id="card-depo" onclick="goPage('depo')">
+      <div class="home-card-icon">🏭</div>
+      <div class="home-card-label">Depo</div>
+    </div>
+    <div class="home-card c-stok" id="card-stok" onclick="goPage('stok')">
+      <div class="home-card-icon">📦</div>
+      <div class="home-card-label">Stok</div>
+    </div>
+    <div class="home-card c-baglan" id="card-baglan" onclick="goPage('baglan')">
+      <div class="home-card-icon">🔗</div>
+      <div class="home-card-label">Bağlantı</div>
+    </div>
+    <div class="home-card c-ayarlar" id="card-ayarlar" onclick="goPage('ayarlar')">
+      <div class="home-card-icon">⚙️</div>
+      <div class="home-card-label">Ayarlar</div>
+    </div>
+  </div>
+</div>
+
+<!-- ===== SORGU ===== -->
+<div class="inner-page" id="page-sorgu">
+  <div class="back-row"><button class="back-btn" onclick="goHome()">← Geri</button><span class="page-title">🔍 Stok Sorgu</span></div>
+  <div class="card">
+    <!-- Barkod ile sorgu -->
+    <div style="font-size:10px;color:var(--muted);margin-bottom:5px;font-weight:600;">📷 Barkod ile Sorgula</div>
+    <div style="display:flex;gap:7px;margin-bottom:8px;">
+      <input class="input" id="sorguInput" placeholder="Barkod girin..." type="text" inputmode="text" autocomplete="off" onkeydown="if(event.key==='Enter')sorguYap()" style="flex:1;font-family:var(--mono);">
+      <button class="btn btn-primary" onclick="sorguYap()">Sorgula</button>
+    </div>
+    <button class="btn btn-secondary btn-full btn-sm" id="sorguKameraBtn" onclick="toggleSorguKamera()" style="margin-bottom:10px;">📷 Kamera ile Oku</button>
+    <div id="qr-sorgu-container" class="qr-wrap"></div>
+    <!-- Model adı ile sorgu -->
+    <div style="border-top:1px solid var(--border);padding-top:10px;margin-top:4px;">
+      <div style="font-size:10px;color:var(--muted);margin-bottom:5px;font-weight:600;">🔤 Model Adı ile Sorgula</div>
+      <div style="display:flex;gap:7px;">
+        <input class="input" id="modelSorguInput" placeholder="Model adı girin... (örn: 5090)" type="text" autocomplete="off"
+          oninput="modelSorguCanli(this.value)"
+          onkeydown="if(event.key==='Enter')modelSorguYap()" style="flex:1;">
+        <button class="btn btn-blue" onclick="modelSorguYap()">Ara</button>
+      </div>
+    </div>
+  </div>
+  <div id="sorguSonuc" style="display:none;">
+    <div class="card" style="padding:0;overflow:hidden;">
+      <div style="padding:9px 12px;background:var(--surface2);border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;">
+        <span class="card-title" style="margin:0;" id="sorguBaslik">Sonuçlar</span>
+        <span id="sorguAdet" style="font-size:11px;color:var(--accent);font-family:var(--mono);font-weight:600;"></span>
+      </div>
+      <div style="overflow-x:auto;">
+        <table class="stok-table">
+          <thead><tr><th>Barkod</th><th>Model</th><th>Renk Seç</th><th>Beden</th><th>Depo</th><th>Alttip</th></tr></thead>
+          <tbody id="sorguTbody"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+  <div id="sorguBos" style="display:none;color:var(--muted);font-size:12px;text-align:center;padding:28px;">Stok kaydı bulunamadı</div>
+
+  <!-- Renk Seçim Modalı -->
+  <div id="renkModalOverlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:300;align-items:flex-end;">
+    <div style="background:var(--surface);border-radius:18px 18px 0 0;padding:16px 14px 28px;width:100%;max-width:480px;margin:0 auto;border-top:1px solid var(--border);">
+      <div style="font-size:14px;font-weight:700;margin-bottom:6px;">🎨 Renk Seç</div>
+      <div style="font-size:11px;color:var(--muted);margin-bottom:12px;" id="renkModalBarkod"></div>
+      <div id="renkSecenekler" style="display:flex;flex-wrap:wrap;gap:8px;"></div>
+      <button class="btn btn-secondary btn-full" style="margin-top:14px;" onclick="renkModalKapat()">Kapat</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===== SAYIM ===== -->
+<div class="inner-page" id="page-sayim">
+  <div class="back-row"><button class="back-btn" onclick="goHome()">← Geri</button><span class="page-title">📋 Sayım</span></div>
+  <button class="btn btn-primary btn-full" onclick="yeniSayimModal()" style="margin-bottom:12px;">➕ Yeni Sayım Başlat</button>
+  <div id="sayimList"><div style="color:var(--muted);font-size:12px;text-align:center;padding:32px 0;">Henüz sayım başlatılmadı</div></div>
+</div>
+
+<!-- ===== TRANSFER ===== -->
+<div class="inner-page" id="page-transfer">
+  <div class="back-row"><button class="back-btn" onclick="goHome()">← Geri</button><span class="page-title">🔄 Transfer</span></div>
+  <button class="btn btn-orange btn-full" onclick="yeniTransferModal()" style="margin-bottom:12px;">➕ Yeni Transfer Başlat</button>
+  <div id="transferList"><div style="color:var(--muted);font-size:12px;text-align:center;padding:32px 0;">Henüz transfer başlatılmadı</div></div>
+</div>
+
+<!-- ===== DEPO ===== -->
+<div class="inner-page" id="page-depo">
+  <div class="back-row"><button class="back-btn" onclick="goHome()">← Geri</button><span class="page-title">🏭 Depolar</span></div>
+  <div class="card">
+    <div class="card-title" style="display:flex;align-items:center;justify-content:space-between;">
+      <span>Depo Listesi</span><span class="badge badge-gray" id="depoCountBadge">0</span>
+    </div>
+    <div id="depoList"><div style="color:var(--muted);font-size:12px;text-align:center;padding:14px 0;">Stok sekmesinden veri yükleyin</div></div>
+  </div>
+  <div class="card">
+    <div class="card-title">➕ Manuel Depo Ekle</div>
+    <div style="display:flex;gap:7px;">
+      <input class="input" id="depoInput" placeholder="Depo adı..." maxlength="50" onkeydown="if(event.key==='Enter')addDepo()" style="flex:1;">
+      <button class="btn btn-primary" onclick="addDepo()">Ekle</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===== STOK ===== -->
+<div class="inner-page" id="page-stok">
+  <div class="back-row"><button class="back-btn" onclick="goHome()">← Geri</button><span class="page-title">📦 Stok</span></div>
+  <div class="card">
+    <div class="card-title">İçe Aktar</div>
+    <p style="font-size:11px;color:var(--muted);margin-bottom:8px;line-height:1.5;">Format: <b style="color:var(--accent2);">Barkod No | Model | Renk | Beden | Depo | Alttip | Fiyat</b></p>
+    <button class="btn btn-primary btn-full" onclick="document.getElementById('stokFile').click()" style="padding:12px;font-size:14px;margin-bottom:7px;">📂 Stok Excel Seç</button>
+    <input type="file" id="stokFile" accept=".xlsx,.xls" style="display:none" onchange="importStok(this)">
+    <button class="btn btn-secondary btn-full btn-sm" onclick="downloadStokSample()">⬇️ Örnek Excel İndir</button>
+  </div>
+  <div id="stokDurum" style="display:none;margin-bottom:10px;padding:9px 12px;background:rgba(74,222,128,.08);border:1px solid rgba(74,222,128,.3);border-radius:8px;font-size:12px;color:var(--accent);font-weight:600;"></div>
+  <div id="stokListeKart" style="display:none;">
+    <div class="card" style="padding:0;overflow:hidden;">
+      <div style="padding:9px 12px;background:var(--surface2);border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;">
+        <span style="font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.8px;">Stok Listesi</span>
+        <span class="badge badge-green" id="stokSayiBadge">0</span>
+      </div>
+      <div style="overflow-x:auto;max-height:400px;overflow-y:auto;">
+        <table class="stok-table">
+          <thead><tr><th>Barkod</th><th>Model</th><th>Renk</th><th>Beden</th><th>Depo</th><th>Alttip</th><th>Fiyat</th></tr></thead>
+          <tbody id="stokTbody"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ===== FİYAT SORGU ===== -->
+<div class="inner-page" id="page-fiyat">
+  <div class="back-row"><button class="back-btn" onclick="goHome()">← Geri</button><span class="page-title">💰 Fiyat Sorgu</span></div>
+  <div class="card">
+    <div style="display:flex;gap:7px;margin-bottom:8px;">
+      <input class="input" id="fiyatInput" placeholder="Barkod girin..." type="text" inputmode="text" autocomplete="off" onkeydown="if(event.key==='Enter')fiyatSorgu()" style="flex:1;font-family:var(--mono);">
+      <button class="btn btn-primary" onclick="fiyatSorgu()">Sorgula</button>
+    </div>
+    <button class="btn btn-secondary btn-full btn-sm" id="fiyatKameraBtn" onclick="toggleFiyatKamera()" style="margin-bottom:7px;">📷 Kamera ile Oku</button>
+    <div id="qr-fiyat-container" class="qr-wrap"></div>
+  </div>
+  <div id="fiyatSonuc" style="display:none;">
+    <div class="card" style="padding:0;overflow:hidden;">
+      <div style="padding:9px 12px;background:var(--surface2);border-bottom:1px solid var(--border);">
+        <span class="card-title" style="margin:0;" id="fiyatBaslik">Sonuçlar</span>
+      </div>
+      <div style="overflow-x:auto;">
+        <table class="stok-table">
+          <thead><tr><th>Barkod</th><th>Model</th><th>Renk</th><th>Beden</th><th>Depo</th><th>Alttip</th><th>Fiyat</th></tr></thead>
+          <tbody id="fiyatTbody"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+  <div id="fiyatBos" style="display:none;color:var(--muted);font-size:12px;text-align:center;padding:28px;">Kayıt bulunamadı</div>
+</div>
+
+<!-- ===== SEPET ===== -->
+<div class="inner-page" id="page-sepet">
+  <div class="back-row"><button class="back-btn" onclick="goHome()">← Geri</button><span class="page-title">🛒 Sepet</span></div>
+  <div class="card">
+    <div style="display:flex;gap:7px;margin-bottom:8px;">
+      <input class="input" id="sepetInput" placeholder="Barkod girin..." type="text" inputmode="text" autocomplete="off" onkeydown="if(event.key==='Enter')sepetEkle()" style="flex:1;font-family:var(--mono);">
+      <button class="btn btn-primary" onclick="sepetEkle()">Ekle</button>
+    </div>
+    <button class="btn btn-secondary btn-full btn-sm" id="sepetKameraBtn" onclick="toggleSepetKamera()" style="margin-bottom:7px;">📷 Kamera ile Oku</button>
+    <div id="qr-sepet-container" class="qr-wrap"></div>
+  </div>
+  <div id="sepetListe" style="display:none;">
+    <div class="card" style="padding:0;overflow:hidden;">
+      <div style="padding:9px 12px;background:var(--surface2);border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;">
+        <span class="card-title" style="margin:0;">Sepet İçeriği</span>
+        <button class="btn btn-danger btn-sm" onclick="sepetTemizle()">🗑 Temizle</button>
+      </div>
+      <div style="overflow-x:auto;">
+        <table class="stok-table">
+          <thead><tr><th>Barkod</th><th>Model</th><th>Renk</th><th>Beden</th><th>Fiyat</th><th></th></tr></thead>
+          <tbody id="sepetTbody"></tbody>
+        </table>
+      </div>
+      <div style="padding:12px;background:var(--surface2);border-top:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;">
+        <span style="font-size:13px;color:var(--muted);">Toplam (<span id="sepetAdet">0</span> ürün)</span>
+        <span style="font-size:18px;font-weight:700;color:var(--accent);font-family:var(--mono);" id="sepetToplam">0.00 ₺</span>
+      </div>
+    </div>
+  </div>
+  <div id="sepetBos" style="color:var(--muted);font-size:12px;text-align:center;padding:28px;">Sepet boş</div>
+</div>
+
+<!-- ===== AYARLAR ===== -->
+<div class="inner-page" id="page-ayarlar">
+  <div class="back-row"><button class="back-btn" onclick="goHome()">← Geri</button><span class="page-title">⚙️ Ayarlar</span></div>
+
+  <!-- Kullanıcı Yönetimi -->
+  <div class="card">
+    <div class="card-title">👥 Kullanıcı Yönetimi</div>
+    <div id="kullaniciListesi" style="margin-bottom:12px;"></div>
+    <div style="background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:10px;">
+      <div style="font-size:11px;font-weight:600;color:var(--muted);margin-bottom:8px;">➕ Yeni Kullanıcı Ekle</div>
+      <div style="display:flex;gap:7px;margin-bottom:7px;">
+        <input class="input" id="yeniKullaniciAd" placeholder="Kullanıcı adı" style="flex:1;">
+        <input class="input" id="yeniKullaniciSifre" placeholder="Şifre" type="password" style="flex:1;">
+      </div>
+      <div style="margin-bottom:8px;">
+        <label class="input-label">Rol</label>
+        <select class="input" id="yeniKullaniciRol" style="cursor:pointer;">
+          <option value="admin">👑 Admin (Tüm yetkiler)</option>
+          <option value="sef">🎩 Şef (Sorgu, Fiyat, Sepet)</option>
+          <option value="tezgahtar">🏪 Tezgahtar (Sadece Sorgu)</option>
+        </select>
+      </div>
+      <button class="btn btn-primary btn-full" onclick="kullaniciEkle()">Kullanıcı Ekle</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">🔐 Şifre Değiştir</div>
+    <div style="display:flex;gap:7px;margin-bottom:8px;">
+      <input class="input" id="mevcutSifre" placeholder="Mevcut şifre" type="password" style="flex:1;">
+      <input class="input" id="yeniSifre" placeholder="Yeni şifre" type="password" style="flex:1;">
+    </div>
+    <button class="btn btn-primary btn-full" onclick="sifreDegistir()">Şifreyi Güncelle</button>
+  </div>
+
+  <div class="card" style="background:rgba(245,158,11,.04);border-color:rgba(245,158,11,.25);">
+    <div class="card-title" style="color:var(--warn);">ℹ️ Rol Yetkileri</div>
+    <div style="font-size:12px;line-height:1.9;color:var(--muted);">
+      <div>👑 <b style="color:var(--text);">Admin</b> → Tüm ekranlar</div>
+      <div>🎩 <b style="color:var(--text);">Şef</b> → Sorgu, Fiyat Sorgu, Sepet</div>
+      <div>🏪 <b style="color:var(--text);">Tezgahtar</b> → Yalnızca Sorgu</div>
+    </div>
+  </div>
+</div>
+
+<!-- ===== BAĞLANTI ===== -->
+<div class="inner-page" id="page-baglan">
+  <div class="back-row"><button class="back-btn" onclick="goHome()">← Geri</button><span class="page-title">🔗 Bağlantı</span></div>
+  <div class="card">
+    <div class="card-title">🔥 Firebase</div>
+    <div style="font-size:11px;color:var(--muted);line-height:1.5;margin-bottom:10px;">Anahtarlar dosya içinde tutulmaz. Bağlanmak için Firebase bilgilerini buraya girip kaydedin.</div>
+    <div class="connect-card" id="fbCard">
+      <div class="connect-status"><div class="dot-off" id="fbDot"></div><span id="fbStatus">Bağlı Değil</span></div>
+      <div style="margin-bottom:8px;"><label class="input-label">API Key</label><input class="input" id="fbApiKey" value="" placeholder="Firebase API Key" style="font-size:11px;font-family:var(--mono);"></div>
+      <div style="margin-bottom:8px;"><label class="input-label">Project ID</label><input class="input" id="fbProjectId" value="" placeholder="Firebase Project ID" style="font-size:11px;font-family:var(--mono);"></div>
+      <div style="margin-bottom:10px;"><label class="input-label">App ID</label><input class="input" id="fbAppId" value="" placeholder="Firebase App ID" style="font-size:11px;font-family:var(--mono);"></div>
+      <div style="display:flex;gap:7px;">
+        <button class="btn btn-primary" style="flex:1" onclick="fbBaglan()">🔌 Bağlan</button>
+        <button class="btn btn-danger btn-sm" onclick="fbKes()">Kes</button>
+      </div>
+    </div>
+  </div>
+  <div class="card" style="background:rgba(245,158,11,.04);border-color:rgba(245,158,11,.25);">
+    <div class="card-title" style="color:var(--warn);">⚡ Durum</div>
+    <div id="baglantiDurum" style="font-size:11px;color:var(--muted);line-height:1.7;">Bağlantı yok. Veriler bu cihazda saklanıyor.</div>
+  </div>
+</div>
+
+<!-- ===== MODALS ===== -->
+
+<!-- Yeni Sayım -->
+<div class="modal-overlay" id="modalYeniSayim">
+  <div class="modal">
+    <button class="modal-close" onclick="closeModal('modalYeniSayim')">✕</button>
+    <div class="modal-title">Yeni Sayım</div>
+    <div style="margin-bottom:10px;"><label class="input-label">Sayım Adı</label>
+      <input class="input" id="sayimAdi" placeholder="Örn: Ocak Sayımı..." onkeydown="if(event.key==='Enter')yeniSayimOlustur()">
+    </div>
+    <div style="margin-bottom:12px;"><label class="input-label">Sayım Deposunu Seçin</label>
+      <div id="sayimDepoSecList"></div>
+    </div>
+    <button class="btn btn-primary btn-full" onclick="yeniSayimOlustur()">Sayım Oluştur</button>
+  </div>
+</div>
+
+<!-- Barkod Okuma (Sayım) -->
+<div class="modal-overlay" id="modalBarkod">
+  <div class="modal" style="padding:12px 12px 20px;">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
+      <div class="modal-title" style="margin:0" id="modalBarkodTitle">Barkod Oku</div>
+      <button class="modal-close" onclick="closeBarkodModal()">✕</button>
+    </div>
+    <div style="background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:8px;margin-bottom:8px;">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">
+        <span style="font-size:10px;color:var(--muted);">📷 Kamera</span>
+        <button class="btn btn-secondary btn-sm" id="kameraBtn" onclick="toggleKamera()" style="padding:4px 10px;font-size:11px;">📷 Aç</button>
+      </div>
+      <div id="qr-reader-container" class="qr-wrap"></div>
+    </div>
+    <div style="display:flex;gap:7px;margin-bottom:8px;">
+      <input class="scan-input" id="barkodInput" placeholder="⌨️ Barkod girin..." type="text" inputmode="text" autocomplete="off" onkeydown="if(event.key==='Enter')barkodEkle()">
+      <button class="btn btn-primary" onclick="barkodEkle()">Ekle</button>
+    </div>
+    <div id="ciftUyari" style="display:none;background:rgba(245,158,11,.12);border:1px solid rgba(245,158,11,.4);border-radius:7px;padding:8px 10px;margin-bottom:8px;font-size:12px;font-weight:600;"></div>
+    <!-- OKUNAN BARKODLAR -->
+    <div id="modalBarkodList" style="max-height:150px;overflow-y:auto;margin-bottom:8px;border:1px solid var(--border);border-radius:8px;padding:0 4px;"></div>
+    <!-- DEPO STOK LİSTESİ -->
+    <div id="depoStokKart" style="display:none;margin-bottom:8px;">
+      <div style="font-size:10px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.7px;margin-bottom:5px;display:flex;align-items:center;justify-content:space-between;">
+        <span>📋 Depodaki Stok Listesi</span>
+        <span id="depoStokOzet" style="font-family:var(--mono);color:var(--accent);"></span>
+      </div>
+      <div id="depoStokListe" style="max-height:200px;overflow-y:auto;border:1px solid var(--border);border-radius:8px;"></div>
+    </div>
+    <div style="display:flex;gap:6px;">
+      <button class="btn btn-secondary btn-sm" style="flex:1" onclick="closeBarkodModal()">Kapat</button>
+      <button class="btn btn-warn btn-sm" style="flex:1" onclick="sayimPaylasModal()">📤 Paylaş</button>
+      <button class="btn btn-primary btn-sm" style="flex:1" onclick="kaydetVeKapat()">💾 Kaydet</button>
+    </div>
+  </div>
+</div>
+
+<!-- Yeni Transfer -->
+<div class="modal-overlay" id="modalYeniTransfer">
+  <div class="modal">
+    <button class="modal-close" onclick="closeModal('modalYeniTransfer')">✕</button>
+    <div class="modal-title">Yeni Transfer</div>
+    <div style="margin-bottom:10px;"><label class="input-label">Transfer Adı</label>
+      <input class="input" id="transferAdi" placeholder="Örn: Nisan Transferi...">
+    </div>
+    <div style="margin-bottom:10px;"><label class="input-label">📤 Çıkış Deposu</label>
+      <div id="transferCikisDepoList"></div>
+    </div>
+    <div style="margin-bottom:12px;"><label class="input-label">📥 Giriş Deposu</label>
+      <div id="transferGirisDepoList"></div>
+    </div>
+    <button class="btn btn-orange btn-full" onclick="yeniTransferOlustur()">Transfer Oluştur</button>
+  </div>
+</div>
+
+<!-- Transfer Barkod Okuma -->
+<div class="modal-overlay" id="modalTransferBarkod">
+  <div class="modal" style="padding:12px 12px 20px;">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
+      <div class="modal-title" style="margin:0" id="modalTransferTitle">Transfer</div>
+      <button class="modal-close" onclick="closeTransferModal()">✕</button>
+    </div>
+    <div style="font-size:11px;color:var(--muted);margin-bottom:8px;" id="transferDepoInfo"></div>
+    <div style="background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:8px;margin-bottom:8px;">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">
+        <span style="font-size:10px;color:var(--muted);">📷 Kamera</span>
+        <button class="btn btn-secondary btn-sm" id="transferKameraBtn" onclick="toggleTransferKamera()" style="padding:4px 10px;font-size:11px;">📷 Aç</button>
+      </div>
+      <div id="qr-transfer-container" class="qr-wrap"></div>
+    </div>
+    <div style="display:flex;gap:7px;margin-bottom:8px;">
+      <input class="scan-input" id="transferBarkodInput" placeholder="⌨️ Barkod girin..." type="text" inputmode="text" autocomplete="off" onkeydown="if(event.key==='Enter')transferBarkodEkle()">
+      <button class="btn btn-orange" onclick="transferBarkodEkle()">Ekle</button>
+    </div>
+    <div id="transferCiftUyari" style="display:none;background:rgba(245,158,11,.12);border:1px solid rgba(245,158,11,.4);border-radius:7px;padding:8px 10px;margin-bottom:8px;font-size:12px;color:var(--warn);font-weight:600;"></div>
+    <div id="modalTransferBarkodList" style="max-height:180px;overflow-y:auto;margin-bottom:8px;border:1px solid var(--border);border-radius:8px;padding:0 4px;"></div>
+    <div style="display:flex;gap:6px;">
+      <button class="btn btn-secondary btn-sm" style="flex:1" onclick="closeTransferModal()">Kapat</button>
+      <button class="btn btn-warn btn-sm" style="flex:1" onclick="transferPaylasModal()">📤 Paylaş</button>
+      <button class="btn btn-orange btn-sm" style="flex:1" onclick="transferKaydetVeKapat()">💾 Kaydet</button>
+    </div>
+  </div>
+</div>
+
+<!-- Paylaş (ortak) -->
+<div class="modal-overlay" id="modalPaylas">
+  <div class="modal">
+    <button class="modal-close" onclick="closeModal('modalPaylas')">✕</button>
+    <div class="modal-title">📤 Paylaş / Aktar</div>
+    <button class="btn btn-green btn-full" style="margin-bottom:12px;padding:12px;" onclick="doExport()">📊 Excel İndir (.xlsx)</button>
+    <div class="share-btn" onclick="doWhatsapp()">
+      <span style="font-size:22px;">💬</span>
+      <div>
+        <div style="font-size:13px;font-weight:600;">WhatsApp ile Paylaş</div>
+        <div style="font-size:10px;color:var(--muted);">Barkod no ve depo bilgilerini gönder</div>
+      </div>
+      <div style="margin-left:auto;font-size:11px;color:var(--accent);font-weight:600;">→</div>
+    </div>
+  </div>
+</div>
+
+<!-- Düzenle -->
+<div class="modal-overlay" id="modalDuzenle">
+  <div class="modal">
+    <button class="modal-close" onclick="closeModal('modalDuzenle')">✕</button>
+    <div class="modal-title">Düzenle</div>
+    <div style="font-size:10px;color:var(--muted);display:flex;gap:6px;padding:0 0 6px;border-bottom:1px solid var(--border);">
+      <span style="min-width:18px;">#</span><span style="flex:1">Barkod</span><span style="flex:1">Depo</span>
+    </div>
+    <div id="duzenleList" style="max-height:340px;overflow-y:auto;"></div>
+    <button class="btn btn-primary btn-full" style="margin-top:10px;" onclick="kaydetDuzenle()">Kaydet</button>
+  </div>
+</div>
+
+<script>
+// ===== STATE =====
+let stokData=[], depolar=[], sayimlar=[], transferler=[];
+let aktifSayimId=null, aktifTransferId=null;
+let aktifPaylasId=null, aktifPaylasType='sayim';
+let aktifDuzenleId=null, aktifDuzenleType='sayim';
+let html5Qr=null, kameraAcik=false, barkodOkunuyor=false;
+let transferQr=null, transferKameraAcik=false, transferOkunuyor=false;
+let sorguQr=null, sorguKameraAcik=false;
+let fbDb=null;
+let seciliSayimDepo=null, seciliCikisDepo=null, seciliGirisDepo=null;
+
+const FB_PIN_KEY='app_pin';
+const DEFAULT_PIN='1234';
+
+// ===== KULLANICI YÖNETİMİ =====
+// Varsayılan kullanıcılar
+const DEFAULT_PASS_HASH='03ac674216f3e15c761ee1a5e255f067953623c8b388b4459e13f978d7c846f4';
+const VARSAYILAN_KULLANICILAR = [
+  {ad:'admin', sifreHash:DEFAULT_PASS_HASH, rol:'admin', sifreDegisti:false},
+  {ad:'sef', sifreHash:DEFAULT_PASS_HASH, rol:'sef', sifreDegisti:false},
+  {ad:'tezgahtar', sifreHash:DEFAULT_PASS_HASH, rol:'tezgahtar', sifreDegisti:false},
+];
+let kullanicilar = [];
+let aktifKullanici = null;
+
+// Rol yetkileri
+const ROL_YETKILERI = {
+  admin:     ['sorgu','sayim','transfer','fiyat','sepet','depo','stok','baglan','ayarlar'],
+  sef:       ['sorgu','fiyat','sepet'],
+  tezgahtar: ['sorgu'],
+};
+
+function esc(v){return (v??'').toString().replace(/[&<>'"]/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[m]));}
+function cleanText(v){return (v??'').toString().replace(/[<>]/g,'').trim();}
+async function sha256(text){
+  const buf=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(text));
+  return Array.from(new Uint8Array(buf)).map(b=>b.toString(16).padStart(2,'0')).join('');
+}
+function normalizeUser(u){
+  const ad=cleanText(u.ad||u.sef||'');
+  const rol=['admin','sef','tezgahtar'].includes(u.rol)?u.rol:'tezgahtar';
+  return {ad, rol, sifreHash:u.sifreHash||null, sifre:u.sifre||null, sifreDegisti:u.sifreDegisti!==false};
+}
+function hasYetki(page){return !!(aktifKullanici && (ROL_YETKILERI[aktifKullanici.rol]||[]).includes(page));}
+function requireYetki(page){if(!hasYetki(page)){showToast('Bu işlem için yetkiniz yok',true);return false;}return true;}
+
+
+async function loginYap(){
+  const ad=cleanText(document.getElementById('loginKullanici').value);
+  const sifre=document.getElementById('loginSifre').value;
+  const err=document.getElementById('loginError');
+  if(!ad||!sifre){err.textContent='Kullanıcı adı ve şifre girin';return;}
+  if(!kullanicilar.length) loadKullanicilar();
+  const sifreHash=await sha256(sifre);
+  const bulunan=kullanicilar.find(k=>{
+    const u=normalizeUser(k);
+    return (u.ad||'').toLowerCase()===ad.toLowerCase() && ((u.sifreHash&&u.sifreHash===sifreHash)||(!u.sifreHash&&u.sifre===sifre));
+  });
+  if(!bulunan){err.textContent='Kullanıcı adı veya şifre hatalı';return;}
+  aktifKullanici=normalizeUser({...bulunan,sifreHash:bulunan.sifreHash||sifreHash,sifre:null});
+  err.textContent='';
+  document.getElementById('loginScreen').classList.add('hidden');
+  document.getElementById('headerKullanici').textContent=`${aktifKullanici.ad} · ${rolAdi(aktifKullanici.rol)}`;
+  homeGridGuncelle();
+  if(aktifKullanici.sifreDegisti===false){showToast('Güvenlik için varsayılan şifreyi değiştirin',false,true);}
+  fbBaglanOtomatik();
+}
+
+function rolAdi(rol){
+  return rol==='admin'?'👑 Admin':rol==='sef'?'🎩 Şef':'🏪 Tezgahtar';
+}
+
+function homeGridGuncelle(){
+  if(!aktifKullanici)return;
+  const yetkiler = ROL_YETKILERI[aktifKullanici.rol]||[];
+  const tumKartlar = ['sorgu','sayim','transfer','fiyat','sepet','depo','stok','baglan','ayarlar'];
+  tumKartlar.forEach(k=>{
+    const el = document.getElementById('card-'+k);
+    if(el) el.classList.toggle('hidden', !yetkiler.includes(k));
+  });
+}
+
+function cikis(){
+  aktifKullanici = null;
+  document.getElementById('loginScreen').classList.remove('hidden');
+  document.getElementById('loginKullanici').value='';
+  document.getElementById('loginSifre').value='';
+  document.getElementById('loginError').textContent='';
+  goHome();
+}
+
+async function kullaniciEkle(){
+  if(!requireYetki('ayarlar'))return;
+  const ad = cleanText(document.getElementById('yeniKullaniciAd').value);
+  const sifre = document.getElementById('yeniKullaniciSifre').value.trim();
+  const rol = document.getElementById('yeniKullaniciRol').value;
+  if(!ad||!sifre){showToast('Ad ve şifre girin',true);return;}
+  if(kullanicilar.find(k=>k.ad===ad)){showToast('Bu kullanıcı zaten var',true);return;}
+  kullanicilar.push({ad,sifreHash:await sha256(sifre),rol,sifreDegisti:true});
+  document.getElementById('yeniKullaniciAd').value='';
+  document.getElementById('yeniKullaniciSifre').value='';
+  saveKullanicilar();
+  renderKullaniciListesi();
+  showToast(`"${ad}" eklendi ✓`);
+}
+
+
+async function sifreDegistir(){
+  if(!aktifKullanici){showToast('Önce giriş yapın',true);return;}
+  const mevcut=document.getElementById('mevcutSifre').value;
+  const yeni=document.getElementById('yeniSifre').value;
+  if(!mevcut||!yeni){showToast('Mevcut ve yeni şifreyi girin',true);return;}
+  if(yeni.length<4){showToast('Yeni şifre en az 4 karakter olmalı',true);return;}
+  const mevcutHash=await sha256(mevcut);
+  const idx=kullanicilar.findIndex(k=>normalizeUser(k).ad===aktifKullanici.ad);
+  if(idx<0){showToast('Kullanıcı bulunamadı',true);return;}
+  const u=normalizeUser(kullanicilar[idx]);
+  if(u.sifreHash!==mevcutHash && u.sifre!==mevcut){showToast('Mevcut şifre hatalı',true);return;}
+  const yeniHash=await sha256(yeni);
+  kullanicilar[idx]={ad:u.ad,rol:u.rol,sifreHash:yeniHash,sifreDegisti:true};
+  aktifKullanici={...aktifKullanici,sifreHash:yeniHash,sifreDegisti:true};
+  document.getElementById('mevcutSifre').value='';
+  document.getElementById('yeniSifre').value='';
+  saveKullanicilar();
+  showToast('Şifre güncellendi ✓');
+}
+
+function kullaniciSil(ad){
+  if(ad==='admin'){showToast('Admin silinemez',true);return;}
+  if(!confirm(`"${ad}" silinsin mi?`))return;
+  kullanicilar = kullanicilar.filter(k=>k.ad!==ad);
+  saveKullanicilar();
+  renderKullaniciListesi();
+}
+
+function renderKullaniciListesi(){
+  const el = document.getElementById('kullaniciListesi');
+  if(!el)return;
+  el.innerHTML = kullanicilar.map(k=>`
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:9px 11px;background:var(--bg);border:1px solid var(--border);border-radius:8px;margin-bottom:7px;">
+      <div>
+        <div style="font-size:13px;font-weight:600;">${esc(k.ad)}</div>
+        <div style="font-size:10px;color:var(--muted);">${rolAdi(k.rol)}</div>
+      </div>
+      ${k.ad!=='admin'?`<button class="btn btn-danger btn-sm" onclick="kullaniciSil('${esc(k.ad)}')">🗑</button>`:''}
+    </div>`).join('');
+}
+
+function saveKullanicilar(){
+  kullanicilar=kullanicilar.map(u=>{const n=normalizeUser(u);return {ad:n.ad,rol:n.rol,sifreHash:n.sifreHash,sifreDegisti:n.sifreDegisti};}).filter(u=>u.ad);
+  try{localStorage.setItem('bs_kullanicilar',JSON.stringify(kullanicilar));}catch(e){}
+  if(fbDb)fbDb.collection('ayarlar').doc('kullanicilar').set({liste:kullanicilar});
+}
+
+function loadKullanicilar(){
+  try{
+    const stored=JSON.parse(localStorage.getItem('bs_kullanicilar')||'null');
+    if(stored&&stored.length) kullanicilar=stored.map(normalizeUser);
+    else kullanicilar=VARSAYILAN_KULLANICILAR.map(normalizeUser);
+  }catch(e){
+    kullanicilar=VARSAYILAN_KULLANICILAR.map(normalizeUser);
+  }
+}
+
+// ===== FİYAT SORGU =====
+function fiyatSorgu(){
+  const bNo = document.getElementById('fiyatInput').value.trim();
+  if(!bNo){showToast('Barkod girin',true);return;}
+  if(!stokData.length){showToast('Önce Stok sekmesinden veri yükleyin',true);return;}
+  const hedef = stokData.find(s=>s.barkodNo.toString().trim()===bNo.toString().trim());
+  if(!hedef){
+    document.getElementById('fiyatSonuc').style.display='none';
+    document.getElementById('fiyatBos').style.display='block';
+    return;
+  }
+  const sonuclar = stokData.filter(s=>s.model.toString().trim()===hedef.model.toString().trim());
+  document.getElementById('fiyatBos').style.display='none';
+  document.getElementById('fiyatSonuc').style.display='block';
+  document.getElementById('fiyatBaslik').textContent=`${hedef.model} · ${sonuclar.length} kayıt`;
+  document.getElementById('fiyatTbody').innerHTML=sonuclar.map(s=>`
+    <tr style="${s.barkodNo.toString().trim()===bNo?'background:rgba(74,222,128,.07);':''}">
+      <td class="td-barkod">${esc(s.barkodNo)}</td>
+      <td>${esc(s.model)||'—'}</td>
+      <td>${esc(s.renk)||'—'}</td>
+      <td>${esc(s.beden)||'—'}</td>
+      <td class="td-depo">${esc(s.depoAdi)||'—'}</td>
+      <td>${esc(s.alttip)||'—'}</td>
+      <td style="color:var(--accent);font-weight:700;font-family:var(--mono);white-space:nowrap;">${s.fiyat?esc(s.fiyat)+' ₺':'—'}</td>
+    </tr>`).join('');
+}
+
+// Fiyat kamera
+let fiyatKameraAcik=false, fiyatQr=null, fiyatNativeStream=null, fiyatNativeScanInterval=null, fiyatDebounce=false;
+function toggleFiyatKamera(){fiyatKameraAcik?stopFiyatKamera():startFiyatKamera();}
+function startFiyatKamera(){
+  const btn=document.getElementById('fiyatKameraBtn');
+  const cont=document.getElementById('qr-fiyat-container');
+  cont.innerHTML='';
+  btn.textContent='⏹ Kapat';
+  btn.style.cssText='background:rgba(248,113,113,.15);border:1px solid var(--danger);color:var(--danger);width:100%;padding:5px;font-size:11px;border-radius:6px;font-weight:600;cursor:pointer;font-family:var(--sans);margin-bottom:7px;';
+  fiyatKameraAcik=true;fiyatDebounce=false;
+  startNativeKamera(cont,decoded=>{
+    if(fiyatDebounce)return;fiyatDebounce=true;
+    if(navigator.vibrate)navigator.vibrate([60,30,60]);
+    document.getElementById('fiyatInput').value=decoded;
+    fiyatSorgu();stopFiyatKamera();
+    setTimeout(()=>fiyatDebounce=false,1500);
+  });
+  setTimeout(()=>{fiyatNativeStream=nativeStream;fiyatNativeScanInterval=nativeScanInterval;},500);
+}
+function stopFiyatKamera(){
+  if(fiyatNativeScanInterval){clearInterval(fiyatNativeScanInterval);fiyatNativeScanInterval=null;}
+  if(fiyatNativeStream){fiyatNativeStream.getTracks().forEach(t=>t.stop());fiyatNativeStream=null;}
+  fiyatKameraAcik=false;
+  const btn=document.getElementById('fiyatKameraBtn');
+  if(btn){btn.textContent='📷 Kamera ile Oku';btn.style.cssText='';}
+  const c=document.getElementById('qr-fiyat-container');if(c)c.innerHTML='';
+}
+
+// ===== SEPET =====
+let sepetUrunler = [];
+let sepetKameraAcik=false, sepetQr=null, sepetNativeStream=null, sepetNativeScanInterval=null, sepetDebounce=false;
+
+function sepetEkle(){
+  const inp=document.getElementById('sepetInput');
+  const bNo=inp.value.trim();if(!bNo)return;
+  const stok=stokData.find(s=>s.barkodNo.toString().trim()===bNo.toString().trim());
+  const urun={
+    barkodNo:bNo,
+    model:stok?stok.model:'Bilinmiyor',
+    renk:stok?stok.renk:'—',
+    beden:stok?stok.beden:'—',
+    fiyat:stok&&stok.fiyat?parseFloat(stok.fiyat.replace(',','.'))||0:0,
+  };
+  sepetUrunler.push(urun);
+  inp.value='';inp.focus();
+  if(navigator.vibrate)navigator.vibrate(50);
+  renderSepet();
+}
+
+function sepetSil(idx){
+  sepetUrunler.splice(idx,1);
+  renderSepet();
+}
+
+function sepetTemizle(){
+  if(!confirm('Sepet temizlensin mi?'))return;
+  sepetUrunler=[];
+  renderSepet();
+}
+
+function renderSepet(){
+  const tbody=document.getElementById('sepetTbody');
+  const liste=document.getElementById('sepetListe');
+  const bos=document.getElementById('sepetBos');
+  if(!sepetUrunler.length){liste.style.display='none';bos.style.display='block';return;}
+  liste.style.display='block';bos.style.display='none';
+  tbody.innerHTML=sepetUrunler.map((u,i)=>`
+    <tr>
+      <td class="td-barkod">${u.barkodNo}</td>
+      <td>${u.model||'—'}</td>
+      <td>${u.renk||'—'}</td>
+      <td>${u.beden||'—'}</td>
+      <td style="color:var(--accent);font-family:var(--mono);font-weight:700;white-space:nowrap;">${u.fiyat?u.fiyat.toFixed(2)+' ₺':'—'}</td>
+      <td><button class="barkod-del" onclick="sepetSil(${i})">🗑</button></td>
+    </tr>`).join('');
+  const toplam=sepetUrunler.reduce((s,u)=>s+(u.fiyat||0),0);
+  document.getElementById('sepetAdet').textContent=sepetUrunler.length;
+  document.getElementById('sepetToplam').textContent=toplam.toFixed(2)+' ₺';
+}
+
+function toggleSepetKamera(){sepetKameraAcik?stopSepetKamera():startSepetKamera();}
+function startSepetKamera(){
+  const btn=document.getElementById('sepetKameraBtn');
+  const cont=document.getElementById('qr-sepet-container');
+  cont.innerHTML='';
+  btn.textContent='⏹ Kapat';
+  btn.style.cssText='background:rgba(248,113,113,.15);border:1px solid var(--danger);color:var(--danger);width:100%;padding:5px;font-size:11px;border-radius:6px;font-weight:600;cursor:pointer;font-family:var(--sans);margin-bottom:7px;';
+  sepetKameraAcik=true;sepetDebounce=false;
+  startNativeKamera(cont,decoded=>{
+    if(sepetDebounce)return;sepetDebounce=true;
+    if(navigator.vibrate)navigator.vibrate([60,30,60]);
+    document.getElementById('sepetInput').value=decoded;
+    sepetEkle();
+    setTimeout(()=>sepetDebounce=false,1200);
+  });
+  setTimeout(()=>{sepetNativeStream=nativeStream;sepetNativeScanInterval=nativeScanInterval;},500);
+}
+function stopSepetKamera(){
+  if(sepetNativeScanInterval){clearInterval(sepetNativeScanInterval);sepetNativeScanInterval=null;}
+  if(sepetNativeStream){sepetNativeStream.getTracks().forEach(t=>t.stop());sepetNativeStream=null;}
+  sepetKameraAcik=false;
+  const btn=document.getElementById('sepetKameraBtn');
+  if(btn){btn.textContent='📷 Kamera ile Oku';btn.style.cssText='';}
+  const c=document.getElementById('qr-sepet-container');if(c)c.innerHTML='';
+}
+
+// ===== NAVIGATION =====
+function goPage(p){
+  if(!requireYetki(p))return;
+  document.getElementById('page-home').style.display='none';
+  document.querySelectorAll('.inner-page').forEach(x=>x.classList.remove('active'));
+  document.getElementById('page-'+p).classList.add('active');
+  // Browser history için push
+  history.pushState({page:p},'',window.location.pathname+'#'+p);
+}
+function goHome(){
+  document.querySelectorAll('.inner-page').forEach(x=>x.classList.remove('active'));
+  document.getElementById('page-home').style.display='';
+  stopKamera();stopTransferKamera();stopSorguKamera();
+  stopFiyatKamera();stopSepetKamera();
+  history.pushState({page:'home'},'',window.location.pathname);
+}
+// Tarayıcı geri tuşu → uygulama ana ekranına dön
+window.addEventListener('popstate',e=>{
+  // Tüm modal'ları kapat
+  document.querySelectorAll('.modal-overlay.open').forEach(m=>m.classList.remove('open'));
+  // Sayfa içinde kalıyoruz
+  document.querySelectorAll('.inner-page').forEach(x=>x.classList.remove('active'));
+  document.getElementById('page-home').style.display='';
+  stopKamera();stopTransferKamera();stopSorguKamera();
+  // Geri gidilmesini engelle (history'de home'u tut)
+  history.pushState({page:'home'},'',window.location.pathname);
+});
+
+// ===== STOK IMPORT =====
+function importStok(input){
+  if(!requireYetki('stok'))return;
+  const file=input.files[0];if(!file)return;
+  const reader=new FileReader();
+  reader.onload=(e)=>{
+    try{
+      const wb=XLSX.read(e.target.result,{type:'binary'});
+      const ws=wb.Sheets[wb.SheetNames[0]];
+      const rows=XLSX.utils.sheet_to_json(ws,{header:1});
+      let hdr=rows[0];if(!hdr){showToast('Excel boş!',true);return;}
+      hdr=hdr.map(h=>(h||'').toString().trim().toLowerCase());
+      const bi=hdr.findIndex(h=>h.includes('barkod'));
+      const mi=hdr.findIndex(h=>h.includes('model'));
+      const ri=hdr.findIndex(h=>h.includes('renk'));
+      const bdi=hdr.findIndex(h=>h.includes('beden'));
+      const di=hdr.findIndex(h=>h.includes('depo'));
+      const ai=hdr.findIndex(h=>h.includes('alttip')||h.includes('alt tip')||h.includes('alt_tip'));
+      const fi=hdr.findIndex(h=>h.includes('fiyat')||h.includes('price')||h.includes('tutar'));
+      if(bi<0){showToast('"Barkod No" sütunu bulunamadı',true);return;}
+      stokData=[];
+      for(let i=1;i<rows.length;i++){
+        const r=rows[i];
+        const bNo=cleanText(r[bi]);
+        if(!bNo)continue;
+        stokData.push({
+          barkodNo:bNo,
+          model:   mi>=0?cleanText(r[mi]):'',
+          renk:    ri>=0?cleanText(r[ri]):'',
+          beden:   bdi>=0?cleanText(r[bdi]):'',
+          depoAdi: di>=0?cleanText(r[di]):'',
+          alttip:  ai>=0?cleanText(r[ai]):'',
+          fiyat:   fi>=0?cleanText(r[fi]):'',
+        });
+      }
+      // Depolarları stoktan güncelle
+      depoDepolarGuncelle();
+      // Lokale kaydet
+      try{localStorage.setItem('bs_stok',JSON.stringify(stokData));localStorage.setItem('bs_dep',JSON.stringify(depolar));}catch(e){}
+      renderStok();renderDepoList();
+      // Firebase — stoku 400'lük parçalara böl (1MB limiti)
+      if(fbDb){
+        const PARCA=400;
+        const toplamParca=Math.ceil(stokData.length/PARCA);
+        // Önce meta bilgisini yaz
+        fbDb.collection('veriler').doc('stok_meta').set({
+          toplamKayit:stokData.length,
+          toplamParca,
+          ts:Date.now()
+        });
+        // Depoları yaz
+        fbDb.collection('veriler').doc('depolar').set({liste:depolar,ts:Date.now()});
+        // Her parçayı ayrı dokümana yaz
+        let yazilan=0;
+        for(let p=0;p<toplamParca;p++){
+          const parca=stokData.slice(p*PARCA,(p+1)*PARCA);
+          fbDb.collection('veriler').doc('stok_'+p).set({liste:parca,parca:p})
+            .then(()=>{
+              yazilan++;
+              if(yazilan===toplamParca){
+                showToast(`${stokData.length} stok kaydı senkronize edildi ✓`);
+              }
+            })
+            .catch(err=>showToast('Firebase yazma hatası: '+err.message,true));
+        }
+      }else{
+        showToast(`${stokData.length} stok kaydı yüklendi ✓`);
+      }
+    }catch(err){showToast('Excel okunamadı: '+err.message,true);}
+  };
+  reader.readAsBinaryString(file);
+  input.value='';
+}
+
+function depoDepolarGuncelle(){
+  // Stoktan gelen depo adlarını tekrarsız ekle
+  const set=new Set(depolar);
+  stokData.forEach(s=>{if(s.depoAdi)set.add(s.depoAdi);});
+  depolar=[...set];
+}
+
+function renderStok(){
+  const durum=document.getElementById('stokDurum');
+  const kart=document.getElementById('stokListeKart');
+  const tbody=document.getElementById('stokTbody');
+  const badge=document.getElementById('stokSayiBadge');
+  if(!stokData.length){durum.style.display='none';kart.style.display='none';return;}
+  durum.style.display='block';
+  durum.textContent=`✓ ${stokData.length} stok kaydı`;
+  badge.textContent=stokData.length+' kayıt';
+  kart.style.display='block';
+  tbody.innerHTML=stokData.map(s=>`
+    <tr>
+      <td class="td-barkod">${esc(s.barkodNo)}</td>
+      <td>${esc(s.model)||'—'}</td>
+      <td>${esc(s.renk)||'—'}</td>
+      <td>${esc(s.beden)||'—'}</td>
+      <td class="td-depo">${esc(s.depoAdi)||'—'}</td>
+      <td>${esc(s.alttip)||'—'}</td>
+      <td style="color:var(--accent);font-family:var(--mono);font-size:10px;">${s.fiyat?esc(s.fiyat)+' ₺':'—'}</td>
+    </tr>`).join('');
+}
+
+function downloadStokSample(){
+  const data=[['Barkod No','Model','Renk','Beden','Depo','Alttip','Fiyat'],
+    ['8690000000001','ABC-123','Siyah','42','Merkez Depo','Spor','1250'],
+    ['8690000000002','ABC-123','Beyaz','40','Şube Depo','Spor','1250'],
+    ['8690000000003','XYZ-456','Mavi','38','Merkez Depo','Klasik','1490']];
+  const ws=XLSX.utils.aoa_to_sheet(data);
+  ws['!cols']=[{wch:18},{wch:12},{wch:10},{wch:8},{wch:12},{wch:14},{wch:10}];
+  const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,'Stok');
+  XLSX.writeFile(wb,'ornek_stok.xlsx');
+}
+
+// ===== DEPO =====
+function renderDepoList(){
+  const list=document.getElementById('depoList');
+  const badge=document.getElementById('depoCountBadge');
+  badge.textContent=depolar.length+' depo';
+  if(!depolar.length){
+    list.innerHTML='<div style="color:var(--muted);font-size:12px;text-align:center;padding:14px 0;">Stok sekmesinden veri yükleyin</div>';
+    return;
+  }
+  // Her depo için stok adedi
+  const depoSayac={};
+  stokData.forEach(s=>{if(s.depoAdi)depoSayac[s.depoAdi]=(depoSayac[s.depoAdi]||0)+1;});
+  list.innerHTML=depolar.map((d,i)=>`
+    <div class="depo-item">
+      <div>
+        <div class="depo-name">${esc(d)}</div>
+        <div class="depo-count">${depoSayac[d]||0} stok kaydı</div>
+      </div>
+      <button class="btn btn-danger btn-sm" onclick="deleteDepo(${i})">🗑</button>
+    </div>`).join('');
+}
+
+function addDepo(){
+  if(!requireYetki('depo'))return;
+  const inp=document.getElementById('depoInput');
+  const ad=inp.value.trim();
+  if(!ad){showToast('Depo adı girin',true);return;}
+  if(depolar.includes(ad)){showToast('Bu depo zaten var',true);return;}
+  depolar.push(ad);inp.value='';
+  try{localStorage.setItem('bs_dep',JSON.stringify(depolar));}catch(e){}
+  if(fbDb)fbDb.collection('veriler').doc('depolar').set({liste:depolar,ts:Date.now()});
+  renderDepoList();
+  showToast(`"${ad}" eklendi ✓`);
+}
+
+function deleteDepo(i){
+  if(!requireYetki('depo'))return;
+  if(!confirm(`"${depolar[i]}" silinsin mi?`))return;
+  depolar.splice(i,1);
+  try{localStorage.setItem('bs_dep',JSON.stringify(depolar));}catch(e){}
+  if(fbDb)fbDb.collection('veriler').doc('depolar').set({liste:depolar,ts:Date.now()});
+  renderDepoList();
+}
+
+// ===== SORGU =====
+let sorguSonuclar = [];
+let aktifRenkFiltre = null; // null = hepsi, string = seçili renk
+let sorguAktifBno = '';
+
+function sorguYap(){
+  const bNo=document.getElementById('sorguInput').value.trim();
+  if(!bNo){showToast('Barkod girin',true);return;}
+  if(!stokData.length){showToast('Önce Stok sekmesinden veri yükleyin',true);return;}
+  const hedef=stokData.find(s=>s.barkodNo.toString().trim()===bNo.toString().trim());
+  if(!hedef){
+    document.getElementById('sorguSonuc').style.display='none';
+    document.getElementById('sorguBos').style.display='block';
+    return;
+  }
+  sorguSonuclar=stokData.filter(s=>s.model.toString().trim()===hedef.model.toString().trim());
+  aktifRenkFiltre=null;
+  sorguAktifBno=bNo;
+  document.getElementById('sorguBos').style.display='none';
+  document.getElementById('sorguSonuc').style.display='block';
+  document.getElementById('sorguBaslik').textContent=`${hedef.model}`;
+  document.getElementById('sorguAdet').textContent=`${sorguSonuclar.length} kayıt`;
+  document.getElementById('modelSorguInput').value=''; // Model alanını temizle
+  renderSorguTablo();
+}
+
+function modelSorguYap(){
+  const aranan=document.getElementById('modelSorguInput').value.trim();
+  if(!aranan){showToast('Model adı girin',true);return;}
+  if(!stokData.length){showToast('Önce Stok sekmesinden veri yükleyin',true);return;}
+  const sonuclar=stokData.filter(s=>
+    s.model.toString().toLowerCase().includes(aranan.toLowerCase())
+  );
+  document.getElementById('sorguInput').value='';
+  document.getElementById('sorguBos').style.display='none';
+  if(!sonuclar.length){
+    document.getElementById('sorguSonuc').style.display='none';
+    document.getElementById('sorguBos').style.display='block';
+    document.getElementById('sorguBos').textContent=`"${aranan}" modeli bulunamadı`;
+    return;
+  }
+  sorguSonuclar=sonuclar;
+  aktifRenkFiltre=null;
+  sorguAktifBno='';
+  document.getElementById('sorguSonuc').style.display='block';
+  // Model adlarını ve kayıt sayısını göster
+  const modeller=[...new Set(sonuclar.map(s=>s.model))];
+  document.getElementById('sorguBaslik').textContent=
+    modeller.length===1?`${modeller[0]}`:`${modeller.join(', ')}`;
+  document.getElementById('sorguAdet').textContent=`${sonuclar.length} kayıt`;
+  renderSorguTablo();
+}
+
+// Canlı arama — yazarken otomatik sonuç güncellenir
+function modelSorguCanli(deger){
+  if(!deger||deger.length<2)return; // En az 2 karakter
+  if(!stokData.length)return;
+  const sonuclar=stokData.filter(s=>
+    s.model.toString().toLowerCase().includes(deger.toLowerCase())
+  );
+  if(!sonuclar.length)return;
+  sorguSonuclar=sonuclar;
+  aktifRenkFiltre=null;
+  sorguAktifBno='';
+  document.getElementById('sorguSonuc').style.display='block';
+  document.getElementById('sorguBos').style.display='none';
+  const modeller=[...new Set(sonuclar.map(s=>s.model))];
+  document.getElementById('sorguBaslik').textContent=
+    modeller.length===1?`${modeller[0]}`:`${modeller.slice(0,3).join(', ')}${modeller.length>3?' +':''}`;
+  document.getElementById('sorguAdet').textContent=`${sonuclar.length} kayıt`;
+  renderSorguTablo();
+}
+
+function renderSorguTablo(){
+  const renkler=[...new Set(sorguSonuclar.map(s=>s.renk).filter(Boolean))];
+  // Filtrele
+  const goster=aktifRenkFiltre?sorguSonuclar.filter(s=>s.renk===aktifRenkFiltre):sorguSonuclar;
+  document.getElementById('sorguTbody').innerHTML=goster.map((s,idx)=>{
+    const isAktif=s.barkodNo.toString().trim()===sorguAktifBno;
+    return `<tr style="${isAktif?'background:rgba(74,222,128,.07);':''}">
+      <td class="td-barkod">${esc(s.barkodNo)}</td>
+      <td>${esc(s.model)||'—'}</td>
+      <td>
+        <button onclick="renkModalAc('${renkler.join('|').replace(/'/g,"\\'")}')"
+          style="background:${aktifRenkFiltre===s.renk?'rgba(34,211,238,.25)':'rgba(34,211,238,.1)'};border:1px solid rgba(34,211,238,.3);color:var(--accent2);border-radius:6px;padding:4px 8px;font-size:11px;cursor:pointer;font-family:var(--sans);font-weight:600;white-space:nowrap;">
+          ${esc(s.renk)||'—'} ▾
+        </button>
+      </td>
+      <td>${esc(s.beden)||'—'}</td>
+      <td class="td-depo">${esc(s.depoAdi)||'—'}</td>
+      <td>${esc(s.alttip)||'—'}</td>
+    </tr>`;
+  }).join('');
+  // Başlık güncelle
+  const adetEl=document.getElementById('sorguAdet');
+  if(adetEl)adetEl.textContent=`${goster.length} kayıt${aktifRenkFiltre?' · '+aktifRenkFiltre:''}`;
+}
+
+function renkModalAc(renklerStr){
+  const renkler=renklerStr.split('|').filter(Boolean);
+  document.getElementById('renkModalBarkod').textContent='Renk seçin';
+  const secenekler=document.getElementById('renkSecenekler');
+  // "Hepsi" butonu + renkler
+  secenekler.innerHTML=`
+    <button onclick="renkSec(null,this)"
+      style="background:${aktifRenkFiltre===null?'rgba(74,222,128,.2)':'var(--surface2)'};border:1px solid ${aktifRenkFiltre===null?'var(--accent)':'var(--border)'};color:${aktifRenkFiltre===null?'var(--accent)':'var(--text)'};border-radius:8px;padding:8px 14px;font-size:13px;font-weight:600;cursor:pointer;font-family:var(--sans);">
+      Hepsi
+    </button>`+
+    renkler.map(r=>`
+    <button onclick="renkSec('${r.replace(/'/g,"\\'")}',this)"
+      style="background:${aktifRenkFiltre===r?'rgba(34,211,238,.2)':'var(--surface2)'};border:1px solid ${aktifRenkFiltre===r?'var(--accent2)':'var(--border)'};color:${aktifRenkFiltre===r?'var(--accent2)':'var(--text)'};border-radius:8px;padding:8px 14px;font-size:13px;font-weight:600;cursor:pointer;font-family:var(--sans);">
+      ${r}
+    </button>`).join('');
+  document.getElementById('renkModalOverlay').style.display='flex';
+}
+
+function renkSec(renk, btn){
+  aktifRenkFiltre=renk;
+  setTimeout(()=>{renkModalKapat();renderSorguTablo();},300);
+}
+
+function renkModalKapat(){
+  document.getElementById('renkModalOverlay').style.display='none';
+}
+document.getElementById('renkModalOverlay').addEventListener('click',e=>{if(e.target===document.getElementById('renkModalOverlay'))renkModalKapat();});
+
+// Sorgu kamera — okuma sonrası KAPANMAZ, açık kalır
+let sorguDebounce=false,sorguNativeStream=null,sorguNativeScanInterval=null;
+function toggleSorguKamera(){sorguKameraAcik?stopSorguKamera():startSorguKamera();}
+function startSorguKamera(){
+  const btn=document.getElementById('sorguKameraBtn');
+  const cont=document.getElementById('qr-sorgu-container');
+  cont.innerHTML='';
+  btn.textContent='⏹ Kapat';
+  btn.style.cssText='background:rgba(248,113,113,.15);border:1px solid var(--danger);color:var(--danger);width:100%;padding:5px;font-size:11px;border-radius:6px;font-weight:600;cursor:pointer;font-family:var(--sans);margin-bottom:7px;';
+  sorguKameraAcik=true;sorguDebounce=false;
+  // Stream referansını hemen sakla
+  const prevStream=nativeStream;const prevInterval=nativeScanInterval;
+  startNativeKamera(cont,decoded=>{
+    if(sorguDebounce)return;sorguDebounce=true;
+    if(navigator.vibrate)navigator.vibrate([60,30,60]);
+    document.getElementById('sorguInput').value=decoded;
+    sorguYap(); // Kamera KAPANMAZ, sonuç gösterilir, kullanıcı devam edebilir
+    setTimeout(()=>sorguDebounce=false,1500);
+  });
+  // Yeni stream'i sakla (startNativeKamera async olduğu için kısa bekle)
+  setTimeout(()=>{
+    if(nativeStream&&nativeStream!==prevStream){
+      sorguNativeStream=nativeStream;
+      sorguNativeScanInterval=nativeScanInterval;
+    }
+  },800);
+}
+function stopSorguKamera(){
+  if(sorguNativeScanInterval){clearInterval(sorguNativeScanInterval);sorguNativeScanInterval=null;}
+  if(sorguNativeStream){sorguNativeStream.getTracks().forEach(t=>t.stop());sorguNativeStream=null;}
+  // nativeScanInterval da temizle
+  if(nativeScanInterval){clearInterval(nativeScanInterval);nativeScanInterval=null;}
+  if(nativeStream){nativeStream.getTracks().forEach(t=>t.stop());nativeStream=null;}
+  sorguKameraAcik=false;
+  const btn=document.getElementById('sorguKameraBtn');
+  if(btn){btn.textContent='📷 Kamera ile Oku';btn.style.cssText='';}
+  const c=document.getElementById('qr-sorgu-container');if(c)c.innerHTML='';
+}
+
+// ===== SAYIM =====
+function yeniSayimModal(){
+  if(!requireYetki('sayim'))return;
+  document.getElementById('sayimAdi').value='';
+  seciliSayimDepo=null;
+  // Depo seçim listesi
+  const lst=document.getElementById('sayimDepoSecList');
+  if(!depolar.length){lst.innerHTML='<div style="color:var(--muted);font-size:12px;">Önce Depo/Stok sekmesinden depo ekleyin</div>';
+  }else{
+    lst.innerHTML=depolar.map(d=>`
+      <div class="depo-item" id="sd-${d}" onclick="secSayimDepo('${d}')">
+        <span class="depo-name">${d}</span>
+      </div>`).join('');
+  }
+  openModal('modalYeniSayim');
+  setTimeout(()=>document.getElementById('sayimAdi').focus(),280);
+}
+
+function secSayimDepo(d){
+  seciliSayimDepo=d;
+  document.querySelectorAll('#sayimDepoSecList .depo-item').forEach(el=>el.classList.remove('selected'));
+  const el=document.getElementById('sd-'+d);
+  if(el)el.classList.add('selected');
+}
+
+function yeniSayimOlustur(){
+  const ad=document.getElementById('sayimAdi').value.trim()||('Sayım '+(sayimlar.length+1));
+  if(!seciliSayimDepo){showToast('Depo seçin',true);return;}
+  const s={id:Date.now().toString(),ad,depo:seciliSayimDepo,tarih:new Date().toLocaleString('tr-TR'),barkodlar:[]};
+  sayimlar.unshift(s);
+  saveLocalSayim();
+  if(fbDb)fbDb.collection('sayimlar').doc(s.id).set(s);
+  closeModal('modalYeniSayim');
+  renderSayimList();
+  showToast(`"${ad}" oluşturuldu`);
+}
+
+function deleteSayim(id){
+  if(!confirm('Bu sayımı silmek istiyor musunuz?'))return;
+  sayimlar=sayimlar.filter(s=>s.id!==id);
+  if(fbDb)fbDb.collection('sayimlar').doc(id).delete().catch(()=>{});
+  saveLocalSayim();renderSayimList();
+  showToast('Sayım silindi');
+}
+
+let sayimFiltre={}; // {sayimId: 'tumu'|'sayildi'|'eksik'|'depodayok'}
+
+function sayimFiltreToggle(sid, tip){
+  if(sayimFiltre[sid]===tip) delete sayimFiltre[sid];
+  else sayimFiltre[sid]=tip;
+  renderSayimList();
+}
+
+function renderSayimList(){
+  const el=document.getElementById('sayimList');
+  if(!sayimlar.length){el.innerHTML='<div style="color:var(--muted);font-size:12px;text-align:center;padding:32px 0;">Henüz sayım başlatılmadı</div>';return;}
+  el.innerHTML=sayimlar.map(s=>{
+    const depoBarkodlar=stokData.filter(b=>b.depoAdi.toString().trim()===(s.depo||'').toString().trim());
+    const sayilanIdler=s.barkodlar.map(b=>b.barkodNo.toString().trim());
+    const sayilanDepodaki=s.barkodlar.filter(b=>b.depodaVar!==false);
+    const sayilanDepodaYok=s.barkodlar.filter(b=>b.depodaVar===false);
+    const eksikBarkodlar=depoBarkodlar.filter(b=>!sayilanIdler.includes(b.barkodNo.toString().trim()));
+    const filtre=sayimFiltre[s.id];
+
+    // Gösterilecek liste
+    let gosterilecek=[];
+    let gosterTip='okunan'; // 'okunan' | 'eksik'
+    if(!filtre||filtre==='sayildi'){
+      gosterilecek=sayilanDepodaki;gosterTip='okunan';
+    }else if(filtre==='depodayok'){
+      gosterilecek=sayilanDepodaYok;gosterTip='okunan';
+    }else if(filtre==='eksik'){
+      gosterilecek=eksikBarkodlar;gosterTip='eksik';
+    }
+
+    const maxGoster=4;
+    const gosterSlice=gosterilecek.slice(0,maxGoster);
+    const fazla=gosterilecek.length-maxGoster;
+
+    const aktifSayildi=(!filtre||filtre==='sayildi');
+    const aktifEksik=filtre==='eksik';
+    const aktifDepodaYok=filtre==='depodayok';
+
+    return `
+    <div class="sayim-item">
+      <div class="sayim-header">
+        <div>
+          <div class="sayim-title">${s.ad}</div>
+          <div class="sayim-meta">📦 ${s.depo||'—'} · ${s.tarih} · ${s.barkodlar.length} adet</div>
+        </div>
+        <div class="sayim-actions">
+          <button class="btn btn-secondary btn-sm" onclick="openBarkodModal('${s.id}')">➕ Oku</button>
+          <button class="btn btn-warn btn-sm" onclick="openDuzenle('${s.id}','sayim')">✏️</button>
+          <button class="btn btn-danger btn-sm" onclick="deleteSayim('${s.id}')">🗑</button>
+        </div>
+      </div>
+      <div class="sayim-body">
+        ${depoBarkodlar.length>0?`
+        <div style="display:flex;gap:7px;margin-bottom:8px;flex-wrap:wrap;">
+          <button onclick="sayimFiltreToggle('${s.id}','sayildi')" style="font-size:11px;background:${aktifSayildi?'rgba(74,222,128,.25)':'rgba(74,222,128,.1)'};color:var(--accent);padding:4px 10px;border-radius:20px;font-weight:600;border:1px solid ${aktifSayildi?'var(--accent)':'rgba(74,222,128,.3)'};cursor:pointer;font-family:var(--sans);">✅ ${sayilanDepodaki.length} sayıldı</button>
+          ${eksikBarkodlar.length>0?`<button onclick="sayimFiltreToggle('${s.id}','eksik')" style="font-size:11px;background:${aktifEksik?'rgba(245,158,11,.25)':'rgba(245,158,11,.1)'};color:var(--warn);padding:4px 10px;border-radius:20px;font-weight:600;border:1px solid ${aktifEksik?'var(--warn)':'rgba(245,158,11,.3)'};cursor:pointer;font-family:var(--sans);">⏳ ${eksikBarkodlar.length} eksik</button>`:''}
+          ${sayilanDepodaYok.length>0?`<button onclick="sayimFiltreToggle('${s.id}','depodayok')" style="font-size:11px;background:${aktifDepodaYok?'rgba(248,113,113,.25)':'rgba(248,113,113,.1)'};color:var(--danger);padding:4px 10px;border-radius:20px;font-weight:600;border:1px solid ${aktifDepodaYok?'var(--danger)':'rgba(248,113,113,.3)'};cursor:pointer;font-family:var(--sans);">🚫 ${sayilanDepodaYok.length} depoda yok</button>`:''}
+        </div>`:''}
+        ${!s.barkodlar.length?'<div style="color:var(--muted);font-size:12px;text-align:center;padding:10px 0;">Henüz barkod okunmadı</div>':
+          gosterTip==='okunan'?
+            gosterSlice.map((b,ri)=>{
+              const idx=s.barkodlar.indexOf(b);
+              const renk=b.depodaVar===false?'var(--danger)':'var(--accent2)';
+              return `<div class="barkod-row"><div><div class="barkod-no" style="color:${renk};">${b.barkodNo}</div><div class="barkod-depo">📦 ${b.depo||s.depo||'—'} ${b.depodaVar===false?'<span style="color:var(--danger);">🚫</span>':'<span style="color:var(--accent);">✓</span>'}</div></div><button class="barkod-del" onclick="deleteSayimBarkod('${s.id}',${idx})">🗑</button></div>`;
+            }).join('')
+          :
+            gosterSlice.map(b=>`
+              <div class="barkod-row"><div><div class="barkod-no" style="color:var(--warn);">${b.barkodNo}</div><div class="barkod-depo">⏳ ${b.model||''} ${b.renk||''} ${b.beden||''}</div></div></div>
+            `).join('')
+        }
+        ${fazla>0?`<button onclick="tumListeGoster('${s.id}','sayim')" style="font-size:11px;color:var(--accent2);background:rgba(34,211,238,.08);border:1px solid rgba(34,211,238,.2);border-radius:6px;padding:4px 12px;cursor:pointer;width:100%;margin-top:4px;font-family:var(--sans);">+${fazla} daha — tümünü göster 👁</button>`:''}
+        ${s.barkodlar.length>0?`<button class="btn btn-green btn-full btn-sm" style="margin-top:8px;" onclick="openPaylas('${s.id}','sayim')">📤 Paylaş / Aktar</button>`:''}
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function deleteSayimBarkod(sid,idx){
+  const s=sayimlar.find(x=>x.id===sid);if(!s)return;
+  s.barkodlar.splice(idx,1);
+  saveLocalSayim();renderSayimList();
+  if(aktifSayimId===sid)renderModalBarkodList();
+  if(fbDb)fbDb.collection('sayimlar').doc(sid).set(s);
+}
+
+// ===== BARKOD GEÇERLİ HARFLER =====
+const GECERLI_BASLAR = ['D','K','X','V','Q','T','R'];
+
+// Barkod modal (sayım)
+function openBarkodModal(sid){
+  aktifSayimId=sid;
+  const s=sayimlar.find(x=>x.id===sid);
+  document.getElementById('modalBarkodTitle').textContent=`📋 ${s.ad} · ${s.depo}`;
+  document.getElementById('barkodInput').value='';
+  document.getElementById('ciftUyari').style.display='none';
+  renderModalBarkodList();
+  renderDepoStokListe(s.depo);
+  openModal('modalBarkod');
+  setTimeout(()=>document.getElementById('barkodInput').focus(),300);
+}
+
+function closeBarkodModal(){
+  document.getElementById('modalBarkod').classList.remove('open');
+  renderSayimList();setTimeout(()=>stopKamera(),100);
+}
+
+function renderDepoStokListe(depoAdi){
+  const kart=document.getElementById('depoStokKart');
+  const liste=document.getElementById('depoStokListe');
+  const ozet=document.getElementById('depoStokOzet');
+  const s=sayimlar.find(x=>x.id===aktifSayimId);
+  if(!stokData.length||!depoAdi){kart.style.display='none';return;}
+  const depoBarkodlar=stokData.filter(b=>b.depoAdi.toString().trim()===depoAdi.toString().trim());
+  if(!depoBarkodlar.length){kart.style.display='none';return;}
+  kart.style.display='block';
+  const sayilanlar=s?s.barkodlar.map(b=>b.barkodNo.toString().trim()):[];
+  const sayilan=depoBarkodlar.filter(b=>sayilanlar.includes(b.barkodNo.toString().trim())).length;
+  ozet.textContent=`${sayilan}/${depoBarkodlar.length} sayıldı`;
+  liste.innerHTML=depoBarkodlar.map(b=>{
+    const bSayildi=sayilanlar.includes(b.barkodNo.toString().trim());
+    return `<div style="display:flex;align-items:center;gap:8px;padding:6px 10px;border-bottom:1px solid var(--border);background:${bSayildi?'rgba(74,222,128,.07)':''};">
+      <div style="width:8px;height:8px;border-radius:50%;background:${bSayildi?'var(--accent)':'var(--border)'};flex-shrink:0;"></div>
+      <div style="flex:1;min-width:0;">
+        <div style="font-family:var(--mono);font-size:11px;color:${bSayildi?'var(--accent)':'var(--accent2)'};">${b.barkodNo}</div>
+        <div style="font-size:10px;color:var(--muted);">${b.model||''} ${b.renk||''} ${b.beden||''}</div>
+      </div>
+      ${bSayildi?'<span style="font-size:10px;color:var(--accent);font-weight:700;">✓</span>':''}
+    </div>`;
+  }).join('');
+}
+
+function barkodEkle(){
+  const inp=document.getElementById('barkodInput');
+  const bNo=inp.value.trim();if(!bNo)return;
+  const s=sayimlar.find(x=>x.id===aktifSayimId);if(!s)return;
+  const u=document.getElementById('ciftUyari');
+  const goster=(mesaj,renk,bg,border)=>{
+    u.style.display='block';u.textContent=mesaj;
+    u.style.color=renk;u.style.background=bg;u.style.borderColor=border;
+  };
+  // Çift okuma
+  if(s.barkodlar.some(b=>b.barkodNo.toString().trim()===bNo.toString().trim())){
+    goster(`⚠️ BU BARKOD OKUTULMUŞ — "${bNo}" zaten listede var!`,'var(--warn)','rgba(245,158,11,.12)','rgba(245,158,11,.4)');
+    inp.value='';inp.focus();if(navigator.vibrate)navigator.vibrate([200,100,200,100,200]);
+    setTimeout(()=>u.style.display='none',3500);return;
+  }
+  // Harf kontrolü
+  if(!GECERLI_BASLAR.includes(bNo.charAt(0).toUpperCase())){
+    goster(`❌ YANLIŞ BARKOD — "${bNo}" geçersiz`,'var(--danger)','rgba(248,113,113,.1)','rgba(248,113,113,.4)');
+    inp.value='';inp.focus();if(navigator.vibrate)navigator.vibrate([300,100,300]);
+    setTimeout(()=>u.style.display='none',4000);return;
+  }
+  // Depoda var mı
+  let depodaVar=true;
+  if(stokData.length>0){
+    depodaVar=stokData.some(b=>
+      b.barkodNo.toString().trim()===bNo.toString().trim()&&
+      b.depoAdi.toString().trim()===s.depo.toString().trim()
+    );
+    if(!depodaVar){
+      goster(`🚫 BARKOD DEPODA YOK — "${bNo}" ${s.depo} deposunda bulunamadı`,'var(--danger)','rgba(248,113,113,.1)','rgba(248,113,113,.4)');
+      if(navigator.vibrate)navigator.vibrate([200,100,200,100,200]);
+      setTimeout(()=>u.style.display='none',5000);
+    }
+  }
+  s.barkodlar.push({barkodNo:bNo,depo:s.depo,depodaVar});
+  inp.value='';inp.focus();
+  saveLocalSayim();renderModalBarkodList();renderDepoStokListe(s.depo);
+  if(fbDb)fbDb.collection('sayimlar').doc(s.id).set(s);
+  if(navigator.vibrate&&depodaVar)navigator.vibrate(50);
+}
+
+function renderModalBarkodList(){
+  const s=sayimlar.find(x=>x.id===aktifSayimId);if(!s)return;
+  const el=document.getElementById('modalBarkodList');
+  if(!s.barkodlar.length){el.innerHTML='<div style="color:var(--muted);font-size:11px;text-align:center;padding:10px;">Henüz okuma yapılmadı</div>';return;}
+  el.innerHTML=s.barkodlar.slice().reverse().map((b,ri)=>{
+    const i=s.barkodlar.length-1-ri;
+    const renk=b.depodaVar===false?'var(--danger)':'var(--accent)';
+    const etiket=b.depodaVar===false?'🚫 Depoda Yok':'✓';
+    return `<div class="barkod-row" style="padding:7px 4px;background:${b.depodaVar===false?'rgba(248,113,113,.05)':''};">
+      <div style="flex:1;min-width:0;">
+        <div style="font-family:var(--mono);font-size:12px;color:${renk};">${b.barkodNo}</div>
+        <div style="font-size:10px;color:var(--muted);">📦 ${b.depo||s.depo||'—'} <span style="color:${renk};font-weight:600;">${etiket}</span></div>
+      </div>
+      <button class="barkod-del" onclick="deleteSayimBarkod('${s.id}',${i})">🗑</button>
+    </div>`;
+  }).join('');
+}
+
+function kaydetVeKapat(){
+  const s=sayimlar.find(x=>x.id===aktifSayimId);
+  const ad=s?s.ad:'Sayım';
+  saveLocalSayim();
+  if(fbDb&&s)fbDb.collection('sayimlar').doc(s.id).set(s);
+  document.getElementById('modalBarkod').classList.remove('open');
+  renderSayimList();
+  showToast(`"${ad}" kaydedildi ✓`);
+  setTimeout(()=>stopKamera(),100);
+}
+
+// ===== KAMERA - Android (BarcodeDetector) + iPhone Safari/Chrome =====
+let sayimOkunuyor=false;
+let nativeStream=null,nativeScanInterval=null;
+let zxingReader=null;
+
+function isIOS(){return /iPad|iPhone|iPod/.test(navigator.userAgent)&&!window.MSStream;}
+function isIOSSafari(){
+  const ua=navigator.userAgent;
+  return isIOS()&&/Safari/i.test(ua)&&!/CriOS|FxiOS|OPiOS|mercury/i.test(ua);
+}
+function isIOSChrome(){return isIOS()&&/CriOS/i.test(navigator.userAgent);}
+
+function startNativeKamera(cont,onDecoded){
+  const wrapper=document.createElement('div');
+  wrapper.style.cssText='position:relative;border-radius:8px;overflow:hidden;background:#000;';
+  const video=document.createElement('video');
+  video.id='cam-video-'+Date.now();
+  video.style.cssText='width:100%;max-height:280px;display:block;object-fit:cover;border-radius:8px;';
+  video.setAttribute('autoplay','');
+  video.setAttribute('muted','');
+  video.setAttribute('playsinline','');
+  video.setAttribute('webkit-playsinline','');
+  const fl=document.createElement('div');
+  fl.style.cssText='position:absolute;inset:0;background:white;opacity:0;pointer-events:none;z-index:10;transition:opacity .08s;';
+  const target=document.createElement('div');
+  target.style.cssText='position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:65%;height:38%;border:2px solid rgba(74,222,128,.8);border-radius:8px;box-shadow:0 0 0 9999px rgba(0,0,0,.4);pointer-events:none;';
+  target.innerHTML='<div style="position:absolute;top:-2px;left:-2px;width:20px;height:20px;border-top:3px solid var(--accent);border-left:3px solid var(--accent);"></div><div style="position:absolute;top:-2px;right:-2px;width:20px;height:20px;border-top:3px solid var(--accent);border-right:3px solid var(--accent);"></div><div style="position:absolute;bottom:-2px;left:-2px;width:20px;height:20px;border-bottom:3px solid var(--accent);border-left:3px solid var(--accent);"></div><div style="position:absolute;bottom:-2px;right:-2px;width:20px;height:20px;border-bottom:3px solid var(--accent);border-right:3px solid var(--accent);"></div>';
+  wrapper.appendChild(video);wrapper.appendChild(fl);wrapper.appendChild(target);
+  cont.appendChild(wrapper);
+
+  const flashVe=(cb)=>{fl.style.opacity='1';setTimeout(()=>fl.style.opacity='0',130);cb();};
+
+  if(isIOS()){
+    // ===== iOS: Safari veya Chrome =====
+    // iOS Chrome (CriOS) da Safari engine kullanır — aynı kısıtlamalar
+    // Çözüm: imageCapture + canvas veya direkt video frame
+    const iosConstraints={
+      video:{
+        facingMode:{exact:'environment'}, // exact ile arka kamera zorla
+        width:{ideal:1280},
+        height:{ideal:720},
+      }
+    };
+    // exact facingMode hata verirse ideal ile dene
+    navigator.mediaDevices.getUserMedia(iosConstraints)
+      .catch(()=>navigator.mediaDevices.getUserMedia({video:{facingMode:{ideal:'environment'}}}))
+      .then(stream=>{
+        nativeStream=stream;
+        video.srcObject=stream;
+        video.play();
+
+        // Video hazır olunca başla
+        video.addEventListener('playing',()=>{
+          iosZXingScan(video,fl,onDecoded,flashVe);
+        },{once:true});
+
+        // Yedek: 2 sn sonra video hala oynuyorsa başlat
+        setTimeout(()=>{
+          if(video.readyState>=2&&!nativeScanInterval){
+            iosZXingScan(video,fl,onDecoded,flashVe);
+          }
+        },2000);
+      })
+      .catch(err=>{
+        showToast('Kamera izni gerekli: Ayarlar → Safari → Kamera → İzin Ver',true);
+      });
+
+  } else {
+    // ===== Android: BarcodeDetector (hızlı) veya ZXing =====
+    navigator.mediaDevices.getUserMedia({
+      video:{facingMode:{ideal:'environment'},width:{ideal:1280,min:640},height:{ideal:720,min:480},frameRate:{ideal:30}}
+    }).then(stream=>{
+      nativeStream=stream;video.srcObject=stream;video.play();
+      let okuma=false;
+      if(typeof BarcodeDetector!=='undefined'){
+        try{
+          const det=new BarcodeDetector({formats:['ean_13','ean_8','code_128','code_39','qr_code','upc_a','upc_e','itf','codabar']});
+          nativeScanInterval=setInterval(async()=>{
+            if(video.readyState<2||okuma)return;
+            try{
+              const b=await det.detect(video);
+              if(b.length>0){okuma=true;flashVe(()=>onDecoded(b[0].rawValue));setTimeout(()=>okuma=false,1500);}
+            }catch(e){}
+          },80);
+          return;
+        }catch(e){}
+      }
+      // BarcodeDetector yoksa ZXing
+      androidZXing(video,fl,onDecoded,flashVe);
+    }).catch(err=>{
+      showToast('Kamera izni gerekli',true);
+    });
+  }
+}
+
+function iosZXingScan(video,fl,onDecoded,flashVe){
+  // ZXing ile canvas üzerinden okuma — iOS'a özel ayarlar
+  if(typeof ZXing==='undefined'){
+    showToast('Sayfa yenileyin — kütüphane yükleniyor',true);
+    return;
+  }
+  try{
+    const hints=new Map();
+    hints.set(ZXing.DecodeHintType.POSSIBLE_FORMATS,[
+      ZXing.BarcodeFormat.EAN_13,
+      ZXing.BarcodeFormat.EAN_8,
+      ZXing.BarcodeFormat.CODE_128,
+      ZXing.BarcodeFormat.CODE_39,
+      ZXing.BarcodeFormat.QR_CODE,
+      ZXing.BarcodeFormat.UPC_A,
+      ZXing.BarcodeFormat.UPC_E,
+      ZXing.BarcodeFormat.ITF,
+      ZXing.BarcodeFormat.CODABAR,
+    ]);
+    hints.set(ZXing.DecodeHintType.TRY_HARDER,true);
+    hints.set(ZXing.DecodeHintType.PURE_BARCODE,false);
+    const reader=new ZXing.MultiFormatReader();
+    reader.setHints(hints);
+    const canvas=document.createElement('canvas');
+    const ctx=canvas.getContext('2d',{willReadFrequently:true,alpha:false});
+    let okuma=false;
+    let frameCount=0;
+
+    nativeScanInterval=setInterval(()=>{
+      if(okuma)return;
+      if(video.readyState<2||video.videoWidth===0||video.paused){return;}
+      frameCount++;
+
+      // Her 3 frame'de bir tara (iOS pil tasarrufu)
+      if(frameCount%3!==0)return;
+
+      // iOS'ta tam çözünürlük sorun çıkarıyor — %75 scale kullan
+      const scale=0.75;
+      canvas.width=Math.floor(video.videoWidth*scale);
+      canvas.height=Math.floor(video.videoHeight*scale);
+
+      try{
+        ctx.drawImage(video,0,0,canvas.width,canvas.height);
+        const imgData=ctx.getImageData(0,0,canvas.width,canvas.height);
+        const lum=new ZXing.RGBLuminanceSource(imgData.data,canvas.width,canvas.height);
+        const bmp=new ZXing.BinaryBitmap(new ZXing.HybridBinarizer(lum));
+        const res=reader.decode(bmp);
+        if(res&&res.getText()){
+          okuma=true;
+          flashVe(()=>onDecoded(res.getText()));
+          setTimeout(()=>okuma=false,1500);
+        }
+      }catch(e){
+        // NotFoundException normal — barkod henüz görünmüyor
+      }
+    },100); // 100ms aralık
+  }catch(e){
+    showToast('Okuyucu başlatılamadı: '+e.message,true);
+  }
+}
+
+function androidZXing(video,fl,onDecoded,flashVe){
+  if(typeof ZXing==='undefined')return;
+  const hints=new Map();
+  hints.set(ZXing.DecodeHintType.POSSIBLE_FORMATS,[ZXing.BarcodeFormat.EAN_13,ZXing.BarcodeFormat.EAN_8,ZXing.BarcodeFormat.CODE_128,ZXing.BarcodeFormat.CODE_39,ZXing.BarcodeFormat.QR_CODE,ZXing.BarcodeFormat.UPC_A,ZXing.BarcodeFormat.UPC_E,ZXing.BarcodeFormat.ITF]);
+  hints.set(ZXing.DecodeHintType.TRY_HARDER,true);
+  const reader=new ZXing.MultiFormatReader();reader.setHints(hints);
+  const canvas=document.createElement('canvas');
+  const ctx=canvas.getContext('2d',{willReadFrequently:true});
+  let okuma=false;
+  nativeScanInterval=setInterval(()=>{
+    if(video.readyState<2||okuma)return;
+    canvas.width=video.videoWidth;canvas.height=video.videoHeight;
+    ctx.drawImage(video,0,0);
+    try{
+      const id=ctx.getImageData(0,0,canvas.width,canvas.height);
+      const lum=new ZXing.RGBLuminanceSource(id.data,canvas.width,canvas.height);
+      const bmp=new ZXing.BinaryBitmap(new ZXing.HybridBinarizer(lum));
+      const res=reader.decode(bmp);
+      if(res){okuma=true;flashVe(()=>onDecoded(res.getText()));setTimeout(()=>okuma=false,1500);}
+    }catch(e){}
+  },100);
+}
+
+function toggleKamera(){kameraAcik?stopKamera():startKamera();}
+function startKamera(){
+  const btn=document.getElementById('kameraBtn');
+  const cont=document.getElementById('qr-reader-container');
+  cont.innerHTML='';
+  btn.textContent='⏹ Kapat';
+  btn.style.cssText='background:rgba(248,113,113,.15);border:1px solid var(--danger);color:var(--danger);padding:4px 10px;font-size:11px;border-radius:6px;font-weight:600;cursor:pointer;';
+  kameraAcik=true;sayimOkunuyor=false;
+  startNativeKamera(cont,decoded=>{
+    if(sayimOkunuyor)return;sayimOkunuyor=true;
+    if(navigator.vibrate)navigator.vibrate([65,35,65]);
+    document.getElementById('barkodInput').value=decoded;
+    barkodEkle();
+    setTimeout(()=>sayimOkunuyor=false,1500);
+  });
+}
+function stopKamera(){
+  if(nativeScanInterval){clearInterval(nativeScanInterval);nativeScanInterval=null;}
+  if(nativeStream){nativeStream.getTracks().forEach(t=>t.stop());nativeStream=null;}
+  if(zxingReader){try{zxingReader.reset();}catch(e){}zxingReader=null;}
+  kameraAcik=false;sayimOkunuyor=false;
+  const btn=document.getElementById('kameraBtn');
+  if(btn){btn.textContent='📷 Aç';btn.style.cssText='';}
+  const c=document.getElementById('qr-reader-container');if(c)c.innerHTML='';
+}
+
+// ===== TRANSFER =====
+function yeniTransferModal(){
+  if(!requireYetki('transfer'))return;
+  document.getElementById('transferAdi').value='';
+  seciliCikisDepo=null;seciliGirisDepo=null;
+  const renderDepoSec=(containerId,prefix,onSec)=>{
+    const lst=document.getElementById(containerId);
+    if(!depolar.length){lst.innerHTML='<div style="color:var(--muted);font-size:12px;">Önce depo ekleyin</div>';return;}
+    lst.innerHTML=depolar.map(d=>`
+      <div class="depo-item" id="${prefix}-${d}" onclick="${onSec}('${d}')">
+        <span class="depo-name">${d}</span>
+      </div>`).join('');
+  };
+  renderDepoSec('transferCikisDepoList','tc',`secCikisDepo`);
+  renderDepoSec('transferGirisDepoList','tg',`secGirisDepo`);
+  openModal('modalYeniTransfer');
+}
+
+function secCikisDepo(d){
+  seciliCikisDepo=d;
+  document.querySelectorAll('#transferCikisDepoList .depo-item').forEach(el=>el.classList.remove('selected'));
+  const el=document.getElementById('tc-'+d);if(el)el.classList.add('selected');
+}
+function secGirisDepo(d){
+  seciliGirisDepo=d;
+  document.querySelectorAll('#transferGirisDepoList .depo-item').forEach(el=>el.classList.remove('selected'));
+  const el=document.getElementById('tg-'+d);if(el)el.classList.add('selected');
+}
+
+function yeniTransferOlustur(){
+  const ad=document.getElementById('transferAdi').value.trim()||('Transfer '+(transferler.length+1));
+  if(!seciliCikisDepo){showToast('Çıkış deposu seçin',true);return;}
+  if(!seciliGirisDepo){showToast('Giriş deposu seçin',true);return;}
+  if(seciliCikisDepo===seciliGirisDepo){showToast('Çıkış ve giriş deposu farklı olmalı',true);return;}
+  const t={id:Date.now().toString(),ad,cikisDepo:seciliCikisDepo,girisDepo:seciliGirisDepo,tarih:new Date().toLocaleString('tr-TR'),barkodlar:[]};
+  transferler.unshift(t);
+  saveLocalTransfer();
+  if(fbDb)fbDb.collection('transferler').doc(t.id).set(t);
+  closeModal('modalYeniTransfer');
+  renderTransferList();
+  showToast(`"${ad}" oluşturuldu`);
+}
+
+function deleteTransfer(id){
+  if(!confirm('Bu transferi silmek istiyor musunuz?'))return;
+  transferler=transferler.filter(t=>t.id!==id);
+  if(fbDb)fbDb.collection('transferler').doc(id).delete().catch(()=>{});
+  saveLocalTransfer();renderTransferList();
+  showToast('Transfer silindi');
+}
+
+function renderTransferList(){
+  const el=document.getElementById('transferList');
+  if(!transferler.length){el.innerHTML='<div style="color:var(--muted);font-size:12px;text-align:center;padding:32px 0;">Henüz transfer başlatılmadı</div>';return;}
+  el.innerHTML=transferler.map(t=>`
+    <div class="sayim-item">
+      <div class="sayim-header">
+        <div>
+          <div class="sayim-title">${t.ad}</div>
+          <div class="sayim-meta">📤${t.cikisDepo} → 📥${t.girisDepo} · ${t.tarih} · ${t.barkodlar.length} adet</div>
+        </div>
+        <div class="sayim-actions">
+          <button class="btn btn-orange btn-sm" onclick="openTransferModal('${t.id}')">➕ Oku</button>
+          <button class="btn btn-warn btn-sm" onclick="openDuzenle('${t.id}','transfer')">✏️</button>
+          <button class="btn btn-danger btn-sm" onclick="deleteTransfer('${t.id}')">🗑</button>
+        </div>
+      </div>
+      <div class="sayim-body">
+        ${!t.barkodlar.length?'<div style="color:var(--muted);font-size:12px;text-align:center;padding:10px 0;">Henüz barkod okunmadı</div>':
+          t.barkodlar.slice(-4).reverse().map((b,ri)=>{
+            const i=t.barkodlar.length-1-ri;
+            return `<div class="barkod-row"><div><div class="barkod-no">${b.barkodNo}</div><div class="barkod-depo">📤${t.cikisDepo} → 📥${t.girisDepo}</div></div><button class="barkod-del" onclick="deleteTransferBarkod('${t.id}',${i})">🗑</button></div>`;
+          }).join('')
+        }
+        ${t.barkodlar.length>4?`<button onclick="tumListeGoster('${t.id}','transfer')" style="font-size:11px;color:var(--accent2);background:rgba(34,211,238,.08);border:1px solid rgba(34,211,238,.2);border-radius:6px;padding:4px 12px;cursor:pointer;width:100%;margin-top:4px;font-family:var(--sans);">+${t.barkodlar.length-4} daha — tümünü göster 👁</button>`:''}
+        ${t.barkodlar.length>0?`<button class="btn btn-orange btn-full btn-sm" style="margin-top:8px;" onclick="openPaylas('${t.id}','transfer')">📤 Paylaş / Aktar</button>`:''}
+      </div>
+    </div>`).join('');
+}
+
+function openTransferModal(tid){
+  aktifTransferId=tid;
+  const t=transferler.find(x=>x.id===tid);
+  document.getElementById('modalTransferTitle').textContent=`🔄 ${t.ad}`;
+  document.getElementById('transferDepoInfo').textContent=`📤 Çıkış: ${t.cikisDepo}  →  📥 Giriş: ${t.girisDepo}`;
+  document.getElementById('transferBarkodInput').value='';
+  document.getElementById('transferCiftUyari').style.display='none';
+  renderTransferBarkodList();
+  openModal('modalTransferBarkod');
+  setTimeout(()=>document.getElementById('transferBarkodInput').focus(),300);
+}
+
+function closeTransferModal(){
+  document.getElementById('modalTransferBarkod').classList.remove('open');
+  renderTransferList();setTimeout(()=>stopTransferKamera(),100);
+}
+
+function deleteTransferBarkod(tid,idx){
+  const t=transferler.find(x=>x.id===tid);if(!t)return;
+  t.barkodlar.splice(idx,1);
+  saveLocalTransfer();renderTransferList();
+  if(aktifTransferId===tid)renderTransferBarkodList();
+  if(fbDb)fbDb.collection('transferler').doc(tid).set(t);
+}
+
+function transferBarkodEkle(){
+  const inp=document.getElementById('transferBarkodInput');
+  const bNo=inp.value.trim();if(!bNo)return;
+  const t=transferler.find(x=>x.id===aktifTransferId);if(!t)return;
+  const u=document.getElementById('transferCiftUyari');
+  // Çift okuma kontrolü
+  if(t.barkodlar.some(b=>b.barkodNo.toString().trim()===bNo.toString().trim())){
+    u.style.display='block';u.textContent=`⚠️ BU BARKOD OKUTULMUŞ — "${bNo}" zaten listede var!`;
+    u.style.color='var(--warn)';
+    inp.value='';inp.focus();
+    if(navigator.vibrate)navigator.vibrate([200,100,200,100,200]);
+    setTimeout(()=>{u.style.display='none';u.style.color='';},3500);return;
+  }
+  // Harf kontrolü
+  const ilkHarf=bNo.charAt(0).toUpperCase();
+  if(!GECERLI_BASLAR.includes(ilkHarf)){
+    u.style.display='block';u.textContent=`❌ YANLIŞ BARKOD — "${bNo}" geçersiz (D,K,X,V,Q,T ile başlamalı)`;
+    u.style.color='var(--danger)';
+    inp.value='';inp.focus();
+    if(navigator.vibrate)navigator.vibrate([300,100,300]);
+    setTimeout(()=>{u.style.display='none';u.style.color='';},4000);return;
+  }
+  // Çıkış deposunda var mı kontrolü
+  if(stokData.length>0){
+    const cikisDepoStok=stokData.find(s=>
+      s.barkodNo.toString().trim()===bNo.toString().trim() &&
+      s.depoAdi.toString().trim()===t.cikisDepo.toString().trim()
+    );
+    if(!cikisDepoStok){
+      u.style.display='block';u.textContent=`🚫 BARKOD DEPODA YOK — "${bNo}" çıkış deposunda (${t.cikisDepo}) bulunamadı — Eklenmedi!`;
+      u.style.color='var(--danger)';
+      inp.value='';inp.focus();
+      if(navigator.vibrate)navigator.vibrate([300,100,300,100,300]);
+      setTimeout(()=>{u.style.display='none';u.style.color='';},5000);return;
+    }
+  }
+  u.style.display='none';u.style.color='';
+  t.barkodlar.push({barkodNo:bNo,cikisDepo:t.cikisDepo,girisDepo:t.girisDepo});
+  inp.value='';inp.focus();
+  saveLocalTransfer();renderTransferBarkodList();
+  if(fbDb)fbDb.collection('transferler').doc(t.id).set(t);
+  if(navigator.vibrate)navigator.vibrate(50);
+}
+
+function renderTransferBarkodList(){
+  const t=transferler.find(x=>x.id===aktifTransferId);if(!t)return;
+  const el=document.getElementById('modalTransferBarkodList');
+  if(!t.barkodlar.length){el.innerHTML='<div style="color:var(--muted);font-size:11px;text-align:center;padding:10px;">Henüz okuma yapılmadı</div>';return;}
+  el.innerHTML=t.barkodlar.slice().reverse().map((b,ri)=>{
+    const i=t.barkodlar.length-1-ri;
+    return `<div class="barkod-row" style="padding:7px 4px;"><div style="flex:1;min-width:0;"><div class="barkod-no">${b.barkodNo}</div><div class="barkod-depo">📤${b.cikisDepo} → 📥${b.girisDepo}</div></div><button class="barkod-del" onclick="deleteTransferBarkod('${t.id}',${i})">🗑</button></div>`;
+  }).join('');
+}
+
+function transferKaydetVeKapat(){
+  const t=transferler.find(x=>x.id===aktifTransferId);
+  const ad=t?t.ad:'Transfer';
+  saveLocalTransfer();
+  if(fbDb&&t)fbDb.collection('transferler').doc(t.id).set(t);
+  document.getElementById('modalTransferBarkod').classList.remove('open');
+  renderTransferList();
+  showToast(`"${ad}" kaydedildi ✓`);
+  setTimeout(()=>stopTransferKamera(),100);
+}
+
+// Transfer kamera
+let trOkunuyor=false,trNativeStream=null,trNativeScanInterval=null;
+function toggleTransferKamera(){transferKameraAcik?stopTransferKamera():startTransferKamera();}
+function startTransferKamera(){
+  const btn=document.getElementById('transferKameraBtn');
+  const cont=document.getElementById('qr-transfer-container');
+  cont.innerHTML='';
+  btn.textContent='⏹ Kapat';
+  btn.style.cssText='background:rgba(248,113,113,.15);border:1px solid var(--danger);color:var(--danger);padding:4px 10px;font-size:11px;border-radius:6px;font-weight:600;cursor:pointer;';
+  transferKameraAcik=true;trOkunuyor=false;
+  startNativeKamera(cont,decoded=>{
+    if(trOkunuyor)return;trOkunuyor=true;
+    if(navigator.vibrate)navigator.vibrate([65,35,65]);
+    document.getElementById('transferBarkodInput').value=decoded;
+    transferBarkodEkle();
+    setTimeout(()=>trOkunuyor=false,1500);
+  });
+  setTimeout(()=>{
+    if(nativeStream){trNativeStream=nativeStream;trNativeScanInterval=nativeScanInterval;}
+  },800);
+}
+function stopTransferKamera(){
+  if(trNativeScanInterval){clearInterval(trNativeScanInterval);trNativeScanInterval=null;}
+  if(trNativeStream){trNativeStream.getTracks().forEach(t=>t.stop());trNativeStream=null;}
+  if(nativeScanInterval){clearInterval(nativeScanInterval);nativeScanInterval=null;}
+  if(nativeStream){nativeStream.getTracks().forEach(t=>t.stop());nativeStream=null;}
+  transferKameraAcik=false;trOkunuyor=false;
+  const btn=document.getElementById('transferKameraBtn');
+  if(btn){btn.textContent='📷 Aç';btn.style.cssText='';}
+  const c=document.getElementById('qr-transfer-container');if(c)c.innerHTML='';
+}
+
+// ===== PAYLAŞ =====
+function sayimPaylasModal(){aktifPaylasId=aktifSayimId;aktifPaylasType='sayim';openModal('modalPaylas');}
+function transferPaylasModal(){aktifPaylasId=aktifTransferId;aktifPaylasType='transfer';openModal('modalPaylas');}
+function openPaylas(id,type){aktifPaylasId=id;aktifPaylasType=type;openModal('modalPaylas');}
+
+function getAktifKayit(){
+  if(aktifPaylasType==='sayim')return sayimlar.find(x=>x.id===aktifPaylasId);
+  return transferler.find(x=>x.id===aktifPaylasId);
+}
+
+function doExport(){
+  const k=getAktifKayit();if(!k||!k.barkodlar.length){showToast('Veri yok',true);return;}
+  let data;
+  if(aktifPaylasType==='sayim'){
+    // Eksik olanları da ekle
+    const depoBarkodlar=stokData.filter(b=>b.depoAdi.toString().trim()===(k.depo||'').toString().trim());
+    const sayilanIdler=k.barkodlar.map(b=>b.barkodNo.toString().trim());
+    data=[['Sıra','Barkod No','Depo','Durum','Sayım Adı','Tarih']];
+    k.barkodlar.forEach((b,i)=>{
+      const durum=b.depodaVar===false?'Depoda Yok':'Okundu';
+      data.push([i+1,b.barkodNo,b.depo||k.depo||'',durum,k.ad,k.tarih]);
+    });
+    // Eksik olanlar
+    const eksikler=depoBarkodlar.filter(b=>!sayilanIdler.includes(b.barkodNo.toString().trim()));
+    eksikler.forEach((b,i)=>{
+      data.push([k.barkodlar.length+i+1,b.barkodNo,b.depoAdi||k.depo||'','Eksik',k.ad,k.tarih]);
+    });
+  }else{
+    data=[['Sıra','Barkod No','Çıkış Depo','Giriş Depo','Transfer Adı','Tarih']];
+    k.barkodlar.forEach((b,i)=>data.push([i+1,b.barkodNo,b.cikisDepo||'',b.girisDepo||'',k.ad,k.tarih]));
+  }
+  const ws=XLSX.utils.aoa_to_sheet(data);
+  const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,'Veri');
+  XLSX.writeFile(wb,`${k.ad.replace(/\s+/g,'_')}.xlsx`);
+  showToast(`${data.length-1} kayıt indirildi ✓`);
+}
+
+function doWhatsapp(){
+  const k=getAktifKayit();if(!k||!k.barkodlar.length){showToast('Veri yok',true);return;}
+  doExport();
+  let mesaj='';
+  if(aktifPaylasType==='sayim'){
+    mesaj=`📋 *${k.ad}*\n📅 ${k.tarih}\n📦 Depo: ${k.depo||'—'}\n🔢 ${k.barkodlar.length} adet\n\n`;
+    mesaj+=k.barkodlar.map((b,i)=>`${i+1}. ${b.barkodNo} | 📦 ${b.depo||k.depo||'—'}`).join('\n');
+  }else{
+    mesaj=`🔄 *${k.ad}*\n📅 ${k.tarih}\n📤 ${k.cikisDepo} → 📥 ${k.girisDepo}\n🔢 ${k.barkodlar.length} adet\n\n`;
+    mesaj+=k.barkodlar.map((b,i)=>`${i+1}. ${b.barkodNo} | 📤 ${b.cikisDepo||k.cikisDepo} → 📥 ${b.girisDepo||k.girisDepo}`).join('\n');
+  }
+  setTimeout(()=>window.open(`https://wa.me/?text=${encodeURIComponent(mesaj)}`,'_blank'),600);
+}
+
+// ===== DÜZENLE =====
+function openDuzenle(id,type){
+  aktifDuzenleId=id;aktifDuzenleType=type;
+  const k=type==='sayim'?sayimlar.find(x=>x.id===id):transferler.find(x=>x.id===id);
+  const el=document.getElementById('duzenleList');
+  if(!k||!k.barkodlar.length){el.innerHTML='<div style="color:var(--muted);font-size:12px;text-align:center;padding:14px;">Barkod yok</div>';}
+  else{
+    el.innerHTML=k.barkodlar.map((b,i)=>`
+      <div class="edit-row">
+        <span class="edit-idx">${i+1}</span>
+        <input class="edit-input" id="ed-b-${i}" value="${b.barkodNo}" placeholder="Barkod">
+        <input class="edit-input" id="ed-d-${i}" value="${type==='sayim'?(b.depo||k.depo||''):(b.cikisDepo||'')}" placeholder="${type==='sayim'?'Depo':'Çıkış'}">
+        ${type==='transfer'?`<input class="edit-input" id="ed-g-${i}" value="${b.girisDepo||''}" placeholder="Giriş">`:''}
+      </div>`).join('');
+  }
+  openModal('modalDuzenle');
+}
+
+function kaydetDuzenle(){
+  if(aktifDuzenleType==='sayim'){
+    const s=sayimlar.find(x=>x.id===aktifDuzenleId);
+    s.barkodlar=s.barkodlar.map((b,i)=>({barkodNo:document.getElementById(`ed-b-${i}`).value.trim()||b.barkodNo,depo:document.getElementById(`ed-d-${i}`).value.trim()}));
+    saveLocalSayim();if(fbDb)fbDb.collection('sayimlar').doc(s.id).set(s);renderSayimList();
+  }else{
+    const t=transferler.find(x=>x.id===aktifDuzenleId);
+    t.barkodlar=t.barkodlar.map((b,i)=>({barkodNo:document.getElementById(`ed-b-${i}`).value.trim()||b.barkodNo,cikisDepo:document.getElementById(`ed-d-${i}`).value.trim(),girisDepo:document.getElementById(`ed-g-${i}`)?.value.trim()||b.girisDepo}));
+    saveLocalTransfer();if(fbDb)fbDb.collection('transferler').doc(t.id).set(t);renderTransferList();
+  }
+  closeModal('modalDuzenle');showToast('Kaydedildi ✓');
+}
+
+// ===== FIREBASE =====
+function fbBaglanOtomatik(){
+  const cfg=localStorage.getItem('fb_cfg');
+  if(cfg){try{const c=JSON.parse(cfg);document.getElementById('fbApiKey').value=c.apiKey;document.getElementById('fbProjectId').value=c.projectId;document.getElementById('fbAppId').value=c.appId;fbBaglan();}catch(e){}}
+  // Güvenlik: HTML içinde varsayılan Firebase anahtarı tutulmaz. Kullanıcı Bağlantı ekranından girerse otomatik bağlanır.
+}
+
+function fbBaglan(){
+  const apiKey=document.getElementById('fbApiKey').value.trim();
+  const projectId=document.getElementById('fbProjectId').value.trim();
+  const appId=document.getElementById('fbAppId').value.trim();
+  if(!apiKey||!projectId||!appId)return;
+  if(!window.firebase){
+    const loadScript=(src,cb)=>{const s=document.createElement('script');s.src=src;s.onload=cb;document.head.appendChild(s);};
+    loadScript('https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js',()=>
+      loadScript('https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js',()=>
+        fbInit(apiKey,projectId,appId)));
+  }else{fbInit(apiKey,projectId,appId);}
+}
+
+function fbInit(apiKey,projectId,appId){
+  try{
+    const cfg={apiKey,authDomain:`${projectId}.firebaseapp.com`,projectId,storageBucket:`${projectId}.appspot.com`,appId};
+    if(!firebase.apps.length)firebase.initializeApp(cfg);
+    fbDb=firebase.firestore();
+    fbDb.collection('_ping').doc('p').set({t:Date.now()}).then(()=>{
+      fbBagliGoster(true);
+      localStorage.setItem('fb_cfg',JSON.stringify({apiKey,projectId,appId}));
+      fbDinle();
+      // PIN senkronize et
+      fbDb.collection('ayarlar').doc('pin').get().then(d=>{
+        if(d.exists){const p=d.data().pin;if(p&&p!==localStorage.getItem('app_pin'))localStorage.setItem('app_pin',p);}
+      });
+    }).catch(err=>{fbBagliGoster(false);showToast('Firebase hatası: '+err.message,true);});
+  }catch(e){showToast('Firebase başlatılamadı: '+e.message,true);}
+}
+
+function fbDinle(){
+  if(!fbDb)return;
+  // Stok — parçalı okuma
+  fbDb.collection('veriler').doc('stok_meta').onSnapshot(meta=>{
+    if(!meta.exists)return;
+    const toplamParca=meta.data().toplamParca||0;
+    const toplamKayit=meta.data().toplamKayit||0;
+    if(toplamParca===0)return;
+    // Tüm parçaları oku
+    const promises=[];
+    for(let p=0;p<toplamParca;p++){
+      promises.push(fbDb.collection('veriler').doc('stok_'+p).get());
+    }
+    Promise.all(promises).then(docs=>{
+      stokData=[];
+      docs.forEach(d=>{if(d.exists)stokData=stokData.concat(d.data().liste||[]);});
+      try{localStorage.setItem('bs_stok',JSON.stringify(stokData));}catch(e){}
+      depoDepolarGuncelle();
+      renderStok();renderDepoList();
+    });
+  });
+  fbDb.collection('veriler').doc('depolar').onSnapshot(snap=>{
+    if(snap.exists){depolar=snap.data().liste||[];try{localStorage.setItem('bs_dep',JSON.stringify(depolar));}catch(e){}renderDepoList();}
+  });
+  fbDb.collection('sayimlar').orderBy('tarih','desc').onSnapshot(snap=>{
+    sayimlar=snap.docs.map(d=>({id:d.id,...d.data()}));
+    try{localStorage.setItem('bs_say',JSON.stringify(sayimlar));}catch(e){}
+    renderSayimList();
+    if(aktifSayimId)renderModalBarkodList();
+  });
+  fbDb.collection('transferler').orderBy('tarih','desc').onSnapshot(snap=>{
+    transferler=snap.docs.map(d=>({id:d.id,...d.data()}));
+    try{localStorage.setItem('bs_tr',JSON.stringify(transferler));}catch(e){}
+    renderTransferList();
+    if(aktifTransferId)renderTransferBarkodList();
+  });
+  fbDb.collection('ayarlar').doc('kullanicilar').onSnapshot(snap=>{
+    if(snap.exists&&snap.data().liste&&snap.data().liste.length){
+      kullanicilar=snap.data().liste;
+      try{localStorage.setItem('bs_kullanicilar',JSON.stringify(kullanicilar));}catch(e){}
+      renderKullaniciListesi();
+    }
+  });
+}
+
+function fbKes(){fbDb=null;fbBagliGoster(false);localStorage.removeItem('fb_cfg');showToast('Firebase kesildi');}
+
+function fbBagliGoster(b){
+  document.getElementById('fbDot').className=b?'dot-on':'dot-off';
+  document.getElementById('fbStatus').textContent=b?'Bağlı ✓':'Bağlı Değil';
+  document.getElementById('fbCard').classList.toggle('connected',b);
+  document.getElementById('connDot').className='conn-dot'+(b?' on':'');
+  document.getElementById('baglantiDurum').innerHTML=b?'🟢 Firebase aktif. Tüm cihazlar senkronize.':'Bağlantı yok. Veriler bu cihazda saklanıyor.';
+}
+
+// ===== LOCAL STORAGE =====
+function saveLocalSayim(){try{localStorage.setItem('bs_say',JSON.stringify(sayimlar));}catch(e){}}
+function saveLocalTransfer(){try{localStorage.setItem('bs_tr',JSON.stringify(transferler));}catch(e){}}
+
+function loadLocal(){
+  try{
+    stokData=JSON.parse(localStorage.getItem('bs_stok')||'[]');
+    depolar=JSON.parse(localStorage.getItem('bs_dep')||'[]');
+    sayimlar=JSON.parse(localStorage.getItem('bs_say')||'[]');
+    transferler=JSON.parse(localStorage.getItem('bs_tr')||'[]');
+  }catch(e){}
+}
+
+// ===== TÜM LİSTE MODAL =====
+function tumListeGoster(id,tip){
+  const kayit=tip==='sayim'?sayimlar.find(x=>x.id===id):transferler.find(x=>x.id===id);
+  if(!kayit)return;
+  let liste=[],baslik='';
+  if(tip==='sayim'){
+    const filtre=sayimFiltre[id];
+    const depoBarkodlar=stokData.filter(b=>b.depoAdi.toString().trim()===(kayit.depo||'').toString().trim());
+    const sayilanIdler=kayit.barkodlar.map(b=>b.barkodNo.toString().trim());
+    if(filtre==='eksik'){
+      liste=depoBarkodlar.filter(b=>!sayilanIdler.includes(b.barkodNo.toString().trim()));
+      baslik=`⏳ Eksik Barkodlar (${liste.length})`;
+    }else if(filtre==='depodayok'){
+      liste=kayit.barkodlar.filter(b=>b.depodaVar===false);
+      baslik=`🚫 Depoda Yok (${liste.length})`;
+    }else{
+      liste=kayit.barkodlar;
+      baslik=`✅ Tüm Sayılanlar (${liste.length})`;
+    }
+  }else{
+    liste=kayit.barkodlar;
+    baslik=`🔄 ${kayit.ad} — Tüm Barkodlar (${liste.length})`;
+  }
+  document.getElementById('tumListeBaslik').textContent=baslik;
+  document.getElementById('tumListeSayac').textContent=`Toplam: ${liste.length} kayıt`;
+  const el=document.getElementById('tumListeIcerik');
+  if(!liste.length){
+    el.innerHTML='<div style="color:var(--muted);font-size:12px;text-align:center;padding:20px;">Liste boş</div>';
+  }else if(tip==='sayim'){
+    const filtre=sayimFiltre[id];
+    if(filtre==='eksik'){
+      el.innerHTML=liste.map((b,i)=>`
+        <div style="display:flex;align-items:center;gap:8px;padding:8px 10px;border-bottom:1px solid var(--border);">
+          <span style="font-size:11px;color:var(--muted);min-width:26px;">${i+1}.</span>
+          <div style="flex:1;">
+            <div style="font-family:var(--mono);font-size:12px;color:var(--warn);">${b.barkodNo}</div>
+            <div style="font-size:10px;color:var(--muted);">${b.model||''} ${b.renk||''} ${b.beden||''}</div>
+          </div>
+        </div>`).join('');
+    }else{
+      el.innerHTML=liste.map((b,i)=>{
+        const renk=b.depodaVar===false?'var(--danger)':'var(--accent2)';
+        const idx=kayit.barkodlar.indexOf(b);
+        return `
+        <div style="display:flex;align-items:center;gap:8px;padding:8px 10px;border-bottom:1px solid var(--border);background:${b.depodaVar===false?'rgba(248,113,113,.04)':''};">
+          <span style="font-size:11px;color:var(--muted);min-width:26px;">${i+1}.</span>
+          <div style="flex:1;">
+            <div style="font-family:var(--mono);font-size:12px;color:${renk};">${b.barkodNo}</div>
+            <div style="font-size:10px;color:var(--muted);">📦 ${b.depo||kayit.depo||'—'} <span style="color:${renk};font-weight:600;">${b.depodaVar===false?'🚫':'✓'}</span></div>
+          </div>
+          <button class="barkod-del" onclick="deleteSayimBarkod('${kayit.id}',${idx});tumListeGoster('${id}','sayim')">🗑</button>
+        </div>`;
+      }).join('');
+    }
+  }else{
+    el.innerHTML=liste.map((b,i)=>{
+      const idx=kayit.barkodlar.indexOf(b);
+      return `
+      <div style="display:flex;align-items:center;gap:8px;padding:8px 10px;border-bottom:1px solid var(--border);">
+        <span style="font-size:11px;color:var(--muted);min-width:26px;">${i+1}.</span>
+        <div style="flex:1;">
+          <div style="font-family:var(--mono);font-size:12px;color:var(--accent2);">${b.barkodNo}</div>
+          <div style="font-size:10px;color:var(--muted);">📤${b.cikisDepo||kayit.cikisDepo} → 📥${b.girisDepo||kayit.girisDepo}</div>
+        </div>
+        <button class="barkod-del" onclick="deleteTransferBarkod('${kayit.id}',${idx});tumListeGoster('${id}','transfer')">🗑</button>
+      </div>`;
+    }).join('');
+  }
+  openModal('modalTumListe');
+}
+
+// ===== HELPERS =====
+function openModal(id){document.getElementById(id).classList.add('open');}
+function closeModal(id){document.getElementById(id).classList.remove('open');}
+function showToast(msg,isErr=false,isWarn=false){
+  document.querySelectorAll('.toast').forEach(t=>t.remove());
+  const t=document.createElement('div');
+  t.className='toast'+(isErr?' error':isWarn?' warn':'');
+  t.textContent=msg;document.body.appendChild(t);
+  setTimeout(()=>t.remove(),2800);
+}
+
+document.querySelectorAll('.modal-overlay').forEach(ov=>{
+  ov.addEventListener('click',e=>{
+    if(e.target!==ov)return;
+    if(ov.id==='modalBarkod')closeBarkodModal();
+    else if(ov.id==='modalTransferBarkod')closeTransferModal();
+    else ov.classList.remove('open');
+  });
+});
+
+
+// ===== PWA =====
+if('serviceWorker' in navigator){
+  window.addEventListener('load',()=>navigator.serviceWorker.register('./service-worker.js').catch(()=>{}));
+}
+let deferredInstallPrompt=null;
+window.addEventListener('beforeinstallprompt',e=>{e.preventDefault();deferredInstallPrompt=e;showToast('Telefona yüklemek için tarayıcı menüsünden Ana ekrana ekle seçin');});
+
+// ===== INIT =====
+// Eski PIN tabanlı storage'ı temizle
+localStorage.removeItem('app_pin');
+loadLocal();
+loadKullanicilar();
+renderKullaniciListesi();
+renderStok();
+renderDepoList();
+renderSayimList();
+renderTransferList();
+renderSepet();
+history.replaceState({page:'home'},'',window.location.pathname);
+</script>
+<!-- MODAL: Tüm Liste -->
+<div class="modal-overlay" id="modalTumListe">
+  <div class="modal" style="padding:14px 13px 24px;max-height:88vh;">
+    <button class="modal-close" onclick="closeModal('modalTumListe')">✕</button>
+    <div class="modal-title" id="tumListeBaslik">Tüm Liste</div>
+    <div id="tumListeIcerik" style="max-height:65vh;overflow-y:auto;border:1px solid var(--border);border-radius:8px;"></div>
+    <div style="margin-top:10px;font-size:11px;color:var(--muted);text-align:center;" id="tumListeSayac"></div>
+  </div>
+</div>
+
+</body>
+</html>
