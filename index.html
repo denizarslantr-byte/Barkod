@@ -666,21 +666,33 @@ async function loginYap(){
   const ad=cleanText(document.getElementById('loginKullanici').value);
   const sifre=document.getElementById('loginSifre').value;
   const err=document.getElementById('loginError');
-  if(!ad||!sifre){err.textContent='Kullanıcı adı ve şifre girin';return;}
+  if(!ad||!sifre){err.textContent='Kullanici adi ve sifre girin';return;}
   if(!kullanicilar.length) loadKullanicilar();
+  err.textContent='';
   const sifreHash=await sha256(sifre);
-  const bulunan=kullanicilar.find(k=>{
-    const u=normalizeUser(k);
-    return (u.ad||'').toLowerCase()===ad.toLowerCase() && ((u.sifreHash&&u.sifreHash===sifreHash)||(!u.sifreHash&&u.sifre===sifre));
-  });
-  if(!bulunan){err.textContent='Kullanıcı adı veya şifre hatalı';return;}
+  let bulunan=kullaniciBul(ad,sifre,sifreHash);
+
+  if(!bulunan && localStorage.getItem('fb_cfg')){
+    err.textContent='Kullanici bilgileri kontrol ediliyor...';
+    await firebaseKullanicilariYukle();
+    bulunan=kullaniciBul(ad,sifre,sifreHash);
+  }
+
+  if(!bulunan){err.textContent='Kullanici adi veya sifre hatali';return;}
   aktifKullanici=normalizeUser({...bulunan,sifreHash:bulunan.sifreHash||sifreHash,sifre:null});
   err.textContent='';
   document.getElementById('loginScreen').classList.add('hidden');
   document.getElementById('headerKullanici').textContent=`${aktifKullanici.ad} · ${rolAdi(aktifKullanici.rol)}`;
   homeGridGuncelle();
-  if(aktifKullanici.sifreDegisti===false){showToast('Güvenlik için varsayılan şifreyi değiştirin',false,true);}
+  if(aktifKullanici.sifreDegisti===false){showToast('Guvenlik icin varsayilan sifreyi degistirin',false,true);}
   fbBaglanOtomatik();
+}
+
+function kullaniciBul(ad,sifre,sifreHash){
+  return kullanicilar.find(k=>{
+    const u=normalizeUser(k);
+    return (u.ad||'').toLowerCase()===ad.toLowerCase() && ((u.sifreHash&&u.sifreHash===sifreHash)||(!u.sifreHash&&u.sifre===sifre));
+  });
 }
 
 function rolAdi(rol){
@@ -1531,6 +1543,8 @@ function startNativeKamera(cont,onDecoded){
   video.setAttribute('muted','');
   video.setAttribute('playsinline','');
   video.setAttribute('webkit-playsinline','');
+  video.muted=true;
+  video.playsInline=true;
   const fl=document.createElement('div');
   fl.style.cssText='position:absolute;inset:0;background:white;opacity:0;pointer-events:none;z-index:10;transition:opacity .08s;';
   const target=document.createElement('div');
@@ -1538,6 +1552,11 @@ function startNativeKamera(cont,onDecoded){
   target.innerHTML='<div style="position:absolute;top:-2px;left:-2px;width:20px;height:20px;border-top:3px solid var(--accent);border-left:3px solid var(--accent);"></div><div style="position:absolute;top:-2px;right:-2px;width:20px;height:20px;border-top:3px solid var(--accent);border-right:3px solid var(--accent);"></div><div style="position:absolute;bottom:-2px;left:-2px;width:20px;height:20px;border-bottom:3px solid var(--accent);border-left:3px solid var(--accent);"></div><div style="position:absolute;bottom:-2px;right:-2px;width:20px;height:20px;border-bottom:3px solid var(--accent);border-right:3px solid var(--accent);"></div>';
   wrapper.appendChild(video);wrapper.appendChild(fl);wrapper.appendChild(target);
   cont.appendChild(wrapper);
+
+  if(!window.isSecureContext||!navigator.mediaDevices||!navigator.mediaDevices.getUserMedia){
+    showToast('Kamera icin HTTPS veya ana ekrana eklenmis PWA gerekir',true);
+    return;
+  }
 
   const flashVe=(cb)=>{fl.style.opacity='1';setTimeout(()=>fl.style.opacity='0',130);cb();};
 
@@ -1558,22 +1577,23 @@ function startNativeKamera(cont,onDecoded){
       .then(stream=>{
         nativeStream=stream;
         video.srcObject=stream;
-        video.play();
 
-        // Video hazır olunca başla
-        video.addEventListener('playing',()=>{
-          iosZXingScan(video,fl,onDecoded,flashVe);
-        },{once:true});
+        const baslat=()=>{
+          if(!nativeScanInterval)iosZXingScan(video,fl,onDecoded,flashVe);
+        };
+        video.addEventListener('loadedmetadata',baslat,{once:true});
+        video.addEventListener('playing',baslat,{once:true});
+        video.play().then(baslat).catch(()=>{
+          showToast('Kamera baslatilamadi. iOS kamera iznini kontrol edin.',true);
+        });
 
-        // Yedek: 2 sn sonra video hala oynuyorsa başlat
         setTimeout(()=>{
-          if(video.readyState>=2&&!nativeScanInterval){
-            iosZXingScan(video,fl,onDecoded,flashVe);
-          }
+          if(video.readyState>=2&&!nativeScanInterval)baslat();
         },2000);
       })
       .catch(err=>{
-        showToast('Kamera izni gerekli: Ayarlar → Safari → Kamera → İzin Ver',true);
+        const msg=err&&err.name==='NotAllowedError'?'Kamera izni kapali: Ayarlar > Safari > Kamera > Izin Ver':'iOS kamerasi acilamadi: '+(err&&err.name?err.name:'izin veya HTTPS sorunu');
+        showToast(msg,true);
       });
 
   } else {
@@ -1581,7 +1601,7 @@ function startNativeKamera(cont,onDecoded){
     navigator.mediaDevices.getUserMedia({
       video:{facingMode:{ideal:'environment'},width:{ideal:1280,min:640},height:{ideal:720,min:480},frameRate:{ideal:30}}
     }).then(stream=>{
-      nativeStream=stream;video.srcObject=stream;video.play();
+      nativeStream=stream;video.srcObject=stream;video.play().catch(()=>showToast('Kamera baslatilamadi',true));
       let okuma=false;
       if(typeof BarcodeDetector!=='undefined'){
         try{
@@ -1999,23 +2019,69 @@ function kaydetDuzenle(){
 }
 
 // ===== FIREBASE =====
+function loadScriptOnce(src){
+  return new Promise((resolve,reject)=>{
+    const existing=[...document.scripts].find(s=>s.src===src);
+    if(existing){resolve();return;}
+    const s=document.createElement('script');
+    s.src=src;s.async=true;
+    s.onload=resolve;
+    s.onerror=()=>reject(new Error(src+' yuklenemedi'));
+    document.head.appendChild(s);
+  });
+}
+
+async function firebaseHazirlaSessiz(){
+  let cfg=null;
+  try{cfg=JSON.parse(localStorage.getItem('fb_cfg')||'null');}catch(e){}
+  if(!cfg){
+    const apiKey=document.getElementById('fbApiKey')?.value.trim();
+    const projectId=document.getElementById('fbProjectId')?.value.trim();
+    const appId=document.getElementById('fbAppId')?.value.trim();
+    if(apiKey&&projectId&&appId)cfg={apiKey,projectId,appId};
+  }
+  if(!cfg||!cfg.apiKey||!cfg.projectId||!cfg.appId)return false;
+  try{
+    await loadScriptOnce('https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js');
+    await loadScriptOnce('https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js');
+    if(!firebase.apps.length){
+      firebase.initializeApp({apiKey:cfg.apiKey,authDomain:`${cfg.projectId}.firebaseapp.com`,projectId:cfg.projectId,storageBucket:`${cfg.projectId}.appspot.com`,appId:cfg.appId});
+    }
+    fbDb=firebase.firestore();
+    return true;
+  }catch(e){return false;}
+}
+
+async function firebaseKullanicilariYukle(){
+  if(!fbDb){const ok=await firebaseHazirlaSessiz();if(!ok)return false;}
+  try{
+    const snap=await fbDb.collection('ayarlar').doc('kullanicilar').get();
+    if(snap.exists&&snap.data().liste&&snap.data().liste.length){
+      kullanicilar=snap.data().liste.map(normalizeUser);
+      localStorage.setItem('bs_kullanicilar',JSON.stringify(kullanicilar));
+      renderKullaniciListesi();
+      return true;
+    }
+  }catch(e){}
+  return false;
+}
+
 function fbBaglanOtomatik(){
   const cfg=localStorage.getItem('fb_cfg');
   if(cfg){try{const c=JSON.parse(cfg);document.getElementById('fbApiKey').value=c.apiKey;document.getElementById('fbProjectId').value=c.projectId;document.getElementById('fbAppId').value=c.appId;fbBaglan();}catch(e){}}
-  // Güvenlik: HTML içinde varsayılan Firebase anahtarı tutulmaz. Kullanıcı Bağlantı ekranından girerse otomatik bağlanır.
+  // Guvenlik: HTML icinde varsayilan Firebase anahtari tutulmaz. Kullanici Baglanti ekranindan girerse otomatik baglanir.
 }
 
-function fbBaglan(){
+async function fbBaglan(){
   const apiKey=document.getElementById('fbApiKey').value.trim();
   const projectId=document.getElementById('fbProjectId').value.trim();
   const appId=document.getElementById('fbAppId').value.trim();
   if(!apiKey||!projectId||!appId)return;
-  if(!window.firebase){
-    const loadScript=(src,cb)=>{const s=document.createElement('script');s.src=src;s.onload=cb;document.head.appendChild(s);};
-    loadScript('https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js',()=>
-      loadScript('https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js',()=>
-        fbInit(apiKey,projectId,appId)));
-  }else{fbInit(apiKey,projectId,appId);}
+  try{
+    await loadScriptOnce('https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js');
+    await loadScriptOnce('https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js');
+    fbInit(apiKey,projectId,appId);
+  }catch(e){fbBagliGoster(false);showToast('Firebase kutuphanesi yuklenemedi: '+e.message,true);}
 }
 
 function fbInit(apiKey,projectId,appId){
@@ -2208,6 +2274,7 @@ localStorage.removeItem('app_pin');
 loadLocal();
 loadKullanicilar();
 renderKullaniciListesi();
+firebaseKullanicilariYukle();
 renderStok();
 renderDepoList();
 renderSayimList();

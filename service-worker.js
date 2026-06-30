@@ -1,12 +1,10 @@
-const CACHE_NAME = 'barkod-sayim-pwa-v2';
+﻿const CACHE_NAME = 'barkod-sayim-pwa-v3';
 const CORE_ASSETS = [
   './',
   './index.html',
   './manifest.json',
   './icons/icon-192.png',
-  './icons/icon-512.png',
-  'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js',
-  'https://unpkg.com/@zxing/library@0.19.1/umd/index.min.js'
+  './icons/icon-512.png'
 ];
 
 self.addEventListener('install', event => {
@@ -21,11 +19,24 @@ self.addEventListener('activate', event => {
 
 self.addEventListener('fetch', event => {
   if (event.request.method !== 'GET') return;
+
+  const url = new URL(event.request.url);
+  const isSameOrigin = url.origin === self.location.origin;
+  const isNavigation = event.request.mode === 'navigate';
+
+  if (!isSameOrigin) return;
+
+  if (isNavigation) {
+    event.respondWith(fetch(event.request).catch(() => caches.match('./index.html')));
+    return;
+  }
+
   event.respondWith(
     caches.match(event.request).then(cached => cached || fetch(event.request).then(response => {
+      if (!response || response.status !== 200) return response;
       const copy = response.clone();
       caches.open(CACHE_NAME).then(cache => cache.put(event.request, copy)).catch(() => null);
       return response;
-    }).catch(() => caches.match('./index.html')))
+    }).catch(() => caches.match(event.request)))
   );
 });

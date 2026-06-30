@@ -1,7 +1,7 @@
-{
-  "name": "Barkod Sayım",
-  "short_name": "Barkod Sayım",
-  "description": "Telefon için barkod stok, sayım, transfer ve fiyat sorgu uygulaması",
+﻿{
+  "name": "Barkod Sayim",
+  "short_name": "Barkod Sayim",
+  "description": "Telefon icin barkod stok, sayim, transfer ve fiyat sorgu uygulamasi",
   "start_url": "./index.html",
   "scope": "./",
   "display": "standalone",
