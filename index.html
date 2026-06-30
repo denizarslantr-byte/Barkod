@@ -465,7 +465,7 @@ body{font-family:var(--sans);background:var(--bg);color:var(--text);min-height:1
   <div class="back-row"><button class="back-btn" onclick="goHome()">← Geri</button><span class="page-title">🔗 Bağlantı</span></div>
   <div class="card">
     <div class="card-title">🔥 Firebase</div>
-    <div style="font-size:11px;color:var(--muted);line-height:1.5;margin-bottom:10px;">Anahtarlar dosya içinde tutulmaz. Bağlanmak için Firebase bilgilerini buraya girip kaydedin.</div>
+    <div style="font-size:11px;color:var(--muted);line-height:1.5;margin-bottom:10px;">Firebase bilgileri otomatik doldurulur. Gerekirse buradan güncelleyip bağlanın.</div>
     <div class="connect-card" id="fbCard">
       <div class="connect-status"><div class="dot-off" id="fbDot"></div><span id="fbStatus">Bağlı Değil</span></div>
       <div style="margin-bottom:8px;"><label class="input-label">API Key</label><input class="input" id="fbApiKey" value="" placeholder="Firebase API Key" style="font-size:11px;font-family:var(--mono);"></div>
@@ -628,6 +628,11 @@ let seciliSayimDepo=null, seciliCikisDepo=null, seciliGirisDepo=null;
 
 const FB_PIN_KEY='app_pin';
 const DEFAULT_PIN='1234';
+const DEFAULT_FIREBASE_CONFIG={
+  apiKey:'AIzaSyDE7WfuCipUM-MiH3TcgeXtMvWMhW9zjX8',
+  projectId:'barkod-sayim',
+  appId:'web:489e2e9d13b3f63cc4e48f'
+};
 
 // ===== KULLANICI YÖNETİMİ =====
 // Varsayılan kullanıcılar
@@ -672,7 +677,7 @@ async function loginYap(){
   const sifreHash=await sha256(sifre);
   let bulunan=kullaniciBul(ad,sifre,sifreHash);
 
-  if(!bulunan && localStorage.getItem('fb_cfg')){
+  if(!bulunan && firebaseConfigVarMi()){
     err.textContent='Kullanici bilgileri kontrol ediliyor...';
     await firebaseKullanicilariYukle();
     bulunan=kullaniciBul(ad,sifre,sifreHash);
@@ -2019,6 +2024,29 @@ function kaydetDuzenle(){
 }
 
 // ===== FIREBASE =====
+function firebaseConfigVarMi(){
+  if(localStorage.getItem('fb_cfg'))return true;
+  return !!(DEFAULT_FIREBASE_CONFIG&&DEFAULT_FIREBASE_CONFIG.apiKey&&DEFAULT_FIREBASE_CONFIG.projectId&&DEFAULT_FIREBASE_CONFIG.appId);
+}
+
+function getFirebaseConfig(){
+  try{
+    const stored=JSON.parse(localStorage.getItem('fb_cfg')||'null');
+    if(stored&&stored.apiKey&&stored.projectId&&stored.appId)return stored;
+  }catch(e){}
+  return DEFAULT_FIREBASE_CONFIG;
+}
+
+function alanlaraFirebaseConfigYaz(cfg){
+  if(!cfg)return;
+  const api=document.getElementById('fbApiKey');
+  const project=document.getElementById('fbProjectId');
+  const app=document.getElementById('fbAppId');
+  if(api&&!api.value)api.value=cfg.apiKey||'';
+  if(project&&!project.value)project.value=cfg.projectId||'';
+  if(app&&!app.value)app.value=cfg.appId||'';
+}
+
 function loadScriptOnce(src){
   return new Promise((resolve,reject)=>{
     const existing=[...document.scripts].find(s=>s.src===src);
@@ -2032,14 +2060,14 @@ function loadScriptOnce(src){
 }
 
 async function firebaseHazirlaSessiz(){
-  let cfg=null;
-  try{cfg=JSON.parse(localStorage.getItem('fb_cfg')||'null');}catch(e){}
+  let cfg=getFirebaseConfig();
   if(!cfg){
     const apiKey=document.getElementById('fbApiKey')?.value.trim();
     const projectId=document.getElementById('fbProjectId')?.value.trim();
     const appId=document.getElementById('fbAppId')?.value.trim();
     if(apiKey&&projectId&&appId)cfg={apiKey,projectId,appId};
   }
+  alanlaraFirebaseConfigYaz(cfg);
   if(!cfg||!cfg.apiKey||!cfg.projectId||!cfg.appId)return false;
   try{
     await loadScriptOnce('https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js');
@@ -2067,12 +2095,13 @@ async function firebaseKullanicilariYukle(){
 }
 
 function fbBaglanOtomatik(){
-  const cfg=localStorage.getItem('fb_cfg');
-  if(cfg){try{const c=JSON.parse(cfg);document.getElementById('fbApiKey').value=c.apiKey;document.getElementById('fbProjectId').value=c.projectId;document.getElementById('fbAppId').value=c.appId;fbBaglan();}catch(e){}}
-  // Guvenlik: HTML icinde varsayilan Firebase anahtari tutulmaz. Kullanici Baglanti ekranindan girerse otomatik baglanir.
+  const c=getFirebaseConfig();
+  alanlaraFirebaseConfigYaz(c);
+  if(c)fbBaglan();
 }
 
 async function fbBaglan(){
+  alanlaraFirebaseConfigYaz(getFirebaseConfig());
   const apiKey=document.getElementById('fbApiKey').value.trim();
   const projectId=document.getElementById('fbProjectId').value.trim();
   const appId=document.getElementById('fbAppId').value.trim();
