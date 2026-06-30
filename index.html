@@ -1272,7 +1272,7 @@ function stopSorguKamera(){
   if(sorguNativeScanInterval){clearInterval(sorguNativeScanInterval);sorguNativeScanInterval=null;}
   if(sorguNativeStream){sorguNativeStream.getTracks().forEach(t=>t.stop());sorguNativeStream=null;}
   // nativeScanInterval da temizle
-  if(nativeScanInterval){clearInterval(nativeScanInterval);nativeScanInterval=null;}
+  if(nativeScanInterval){if(typeof nativeScanInterval.stop==='function')nativeScanInterval.stop();else clearInterval(nativeScanInterval);nativeScanInterval=null;}
   if(nativeStream){nativeStream.getTracks().forEach(t=>t.stop());nativeStream=null;}
   sorguKameraAcik=false;
   const btn=document.getElementById('sorguKameraBtn');
@@ -1630,14 +1630,12 @@ function startNativeKamera(cont,onDecoded){
 }
 
 function iosZXingScan(video,fl,onDecoded,flashVe){
-  // ZXing ile canvas üzerinden okuma — iOS'a özel ayarlar
   if(typeof ZXing==='undefined'){
-    showToast('Sayfa yenileyin — kütüphane yükleniyor',true);
+    showToast('Okuyucu yuklenemedi. Sayfayi yenileyin.',true);
     return;
   }
   try{
-    const hints=new Map();
-    hints.set(ZXing.DecodeHintType.POSSIBLE_FORMATS,[
+    const formats=[
       ZXing.BarcodeFormat.EAN_13,
       ZXing.BarcodeFormat.EAN_8,
       ZXing.BarcodeFormat.CODE_128,
@@ -1647,29 +1645,38 @@ function iosZXingScan(video,fl,onDecoded,flashVe){
       ZXing.BarcodeFormat.UPC_E,
       ZXing.BarcodeFormat.ITF,
       ZXing.BarcodeFormat.CODABAR,
-    ]);
+    ];
+    const hints=new Map();
+    hints.set(ZXing.DecodeHintType.POSSIBLE_FORMATS,formats);
     hints.set(ZXing.DecodeHintType.TRY_HARDER,true);
-    hints.set(ZXing.DecodeHintType.PURE_BARCODE,false);
+
+    let okuma=false;
+
+    if(ZXing.BrowserMultiFormatReader){
+      zxingReader=new ZXing.BrowserMultiFormatReader(hints,250);
+      nativeScanInterval={stop:()=>{try{zxingReader&&zxingReader.reset();}catch(e){}}};
+      zxingReader.decodeFromVideoElementContinuously(video,(result,err)=>{
+        if(!result||okuma)return;
+        okuma=true;
+        flashVe(()=>onDecoded(result.getText()));
+        setTimeout(()=>okuma=false,1500);
+      });
+      return;
+    }
+
     const reader=new ZXing.MultiFormatReader();
     reader.setHints(hints);
     const canvas=document.createElement('canvas');
     const ctx=canvas.getContext('2d',{willReadFrequently:true,alpha:false});
-    let okuma=false;
     let frameCount=0;
 
     nativeScanInterval=setInterval(()=>{
       if(okuma)return;
-      if(video.readyState<2||video.videoWidth===0||video.paused){return;}
+      if(video.readyState<2||video.videoWidth===0||video.paused)return;
       frameCount++;
-
-      // Her 3 frame'de bir tara (iOS pil tasarrufu)
-      if(frameCount%3!==0)return;
-
-      // iOS'ta tam çözünürlük sorun çıkarıyor — %75 scale kullan
-      const scale=0.75;
-      canvas.width=Math.floor(video.videoWidth*scale);
-      canvas.height=Math.floor(video.videoHeight*scale);
-
+      if(frameCount%2!==0)return;
+      canvas.width=video.videoWidth;
+      canvas.height=video.videoHeight;
       try{
         ctx.drawImage(video,0,0,canvas.width,canvas.height);
         const imgData=ctx.getImageData(0,0,canvas.width,canvas.height);
@@ -1681,12 +1688,10 @@ function iosZXingScan(video,fl,onDecoded,flashVe){
           flashVe(()=>onDecoded(res.getText()));
           setTimeout(()=>okuma=false,1500);
         }
-      }catch(e){
-        // NotFoundException normal — barkod henüz görünmüyor
-      }
-    },100); // 100ms aralık
+      }catch(e){}
+    },120);
   }catch(e){
-    showToast('Okuyucu başlatılamadı: '+e.message,true);
+    showToast('iOS okuyucu baslatilamadi: '+e.message,true);
   }
 }
 
@@ -1730,7 +1735,7 @@ function startKamera(){
   });
 }
 function stopKamera(){
-  if(nativeScanInterval){clearInterval(nativeScanInterval);nativeScanInterval=null;}
+  if(nativeScanInterval){if(typeof nativeScanInterval.stop==='function')nativeScanInterval.stop();else clearInterval(nativeScanInterval);nativeScanInterval=null;}
   if(nativeStream){nativeStream.getTracks().forEach(t=>t.stop());nativeStream=null;}
   if(zxingReader){try{zxingReader.reset();}catch(e){}zxingReader=null;}
   kameraAcik=false;sayimOkunuyor=false;
@@ -1933,7 +1938,7 @@ function startTransferKamera(){
 function stopTransferKamera(){
   if(trNativeScanInterval){clearInterval(trNativeScanInterval);trNativeScanInterval=null;}
   if(trNativeStream){trNativeStream.getTracks().forEach(t=>t.stop());trNativeStream=null;}
-  if(nativeScanInterval){clearInterval(nativeScanInterval);nativeScanInterval=null;}
+  if(nativeScanInterval){if(typeof nativeScanInterval.stop==='function')nativeScanInterval.stop();else clearInterval(nativeScanInterval);nativeScanInterval=null;}
   if(nativeStream){nativeStream.getTracks().forEach(t=>t.stop());nativeStream=null;}
   transferKameraAcik=false;trOkunuyor=false;
   const btn=document.getElementById('transferKameraBtn');
