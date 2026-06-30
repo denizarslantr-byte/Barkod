@@ -23,21 +23,6 @@
 *{box-sizing:border-box;margin:0;padding:0;}
 body{font-family:var(--sans);background:var(--bg);color:var(--text);min-height:100vh;max-width:480px;margin:0 auto;}
 
-/* LOGIN */
-#loginScreen{display:none!important;visibility:hidden!important;pointer-events:none!important;}
-#loginScreen.hidden{display:none;}
-.login-logo{width:72px;height:72px;background:var(--accent);border-radius:18px;display:flex;align-items:center;justify-content:center;font-size:36px;margin-bottom:20px;}
-.login-title{font-size:24px;font-weight:700;margin-bottom:6px;text-align:center;}
-.login-sub{font-size:13px;color:var(--muted);text-align:center;margin-bottom:24px;line-height:1.6;}
-.login-form{width:100%;max-width:320px;position:relative;z-index:10000;pointer-events:auto;}
-.login-input{width:100%;background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:12px 14px;color:var(--text);font-size:16px;font-family:var(--sans);margin-bottom:10px;outline:none;position:relative;z-index:10001;pointer-events:auto;-webkit-user-select:text;user-select:text;-webkit-appearance:none;appearance:none;}
-.login-input:focus{border-color:var(--accent);}
-.login-input::placeholder{color:var(--muted);}
-.login-btn{width:100%;background:var(--accent);color:#0f1117;border:none;border-radius:10px;padding:13px;font-size:16px;font-weight:700;cursor:pointer;font-family:var(--sans);position:relative;z-index:10001;pointer-events:auto;-webkit-appearance:none;appearance:none;}
-.login-error{color:var(--danger);font-size:13px;margin-top:8px;text-align:center;min-height:20px;}
-.pin-error{color:var(--danger);font-size:13px;margin-top:12px;text-align:center;min-height:20px;}
-.pin-hint{font-size:11px;color:var(--muted);margin-top:8px;text-align:center;}
-
 /* HEADER */
 .app-header{background:var(--surface);border-bottom:1px solid var(--border);padding:10px 14px;display:flex;align-items:center;gap:10px;position:sticky;top:0;z-index:100;}
 .app-logo{width:28px;height:28px;background:var(--accent);border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:14px;}
@@ -45,7 +30,6 @@ body{font-family:var(--sans);background:var(--bg);color:var(--text);min-height:1
 .header-right{margin-left:auto;display:flex;align-items:center;gap:8px;}
 .conn-dot{width:8px;height:8px;border-radius:50%;background:var(--danger);}
 .conn-dot.on{background:var(--accent);box-shadow:0 0 5px var(--accent);}
-.logout-btn{background:none;border:1px solid var(--border);color:var(--muted);border-radius:5px;padding:3px 8px;font-size:10px;cursor:pointer;font-family:var(--sans);}
 
 /* HOME GRID */
 #page-home{padding:16px 12px;}
@@ -178,32 +162,14 @@ body{font-family:var(--sans);background:var(--bg);color:var(--text);min-height:1
 </head>
 <body>
 
-<!-- LOGIN: Kullanıcı Adı + Şifre -->
-<!-- LOGIN REMOVED
-<div id="loginScreen">
-  <div class="login-logo">📦</div>
-  <div class="login-title">Barkod Sayım</div>
-  <div class="login-sub">Kullanıcı adı ve şifrenizi girin</div>
-  <div class="login-form">
-    <input class="login-input" id="loginKullanici" placeholder="Kullanıcı adı" type="text" autocomplete="off" onkeydown="if(event.key==='Enter')document.getElementById('loginSifre').focus()">
-    <input class="login-input" id="loginSifre" placeholder="Şifre" type="password" onkeydown="if(event.key==='Enter')loginYap()">
-    <button class="login-btn" onclick="loginYap()">Giriş Yap</button>
-    <div class="login-error" id="loginError"></div>
-    <div class="pin-hint" style="margin-top:12px;">İlk kurulumdan sonra varsayılan şifreleri Ayarlar bölümünden değiştirin.</div>
-  </div>
-</div>
-LOGIN REMOVED -->
-
 <!-- HEADER -->
 <div class="app-header">
   <div class="app-logo">📦</div>
   <div>
     <div class="app-title">Barkod Sayım</div>
-    <div style="font-size:10px;color:var(--muted);" id="headerKullanici"></div>
   </div>
   <div class="header-right">
     <div class="conn-dot" id="connDot"></div>
-    <button class="logout-btn" onclick="cikis()">Çıkış</button>
   </div>
 </div>
 
@@ -628,8 +594,6 @@ let sorguQr=null, sorguKameraAcik=false;
 let fbDb=null;
 let seciliSayimDepo=null, seciliCikisDepo=null, seciliGirisDepo=null;
 
-const FB_PIN_KEY='app_pin';
-const DEFAULT_PIN='1234';
 const DEFAULT_FIREBASE_CONFIG={
   apiKey:'AIzaSyDE7WfuCipUM-MiH3TcgeXtMvWMhW9zjX8',
   projectId:'barkod-sayim',
@@ -669,39 +633,6 @@ function hasYetki(page){return !!(aktifKullanici && (ROL_YETKILERI[aktifKullanic
 function requireYetki(page){if(!hasYetki(page)){showToast('Bu işlem için yetkiniz yok',true);return false;}return true;}
 
 
-async function loginYap(){
-  const ad=cleanText(document.getElementById('loginKullanici').value);
-  const sifre=document.getElementById('loginSifre').value;
-  const err=document.getElementById('loginError');
-  if(!ad||!sifre){err.textContent='Kullanici adi ve sifre girin';return;}
-  if(!kullanicilar.length) loadKullanicilar();
-  err.textContent='';
-  const sifreHash=await sha256(sifre);
-  let bulunan=kullaniciBul(ad,sifre,sifreHash);
-
-  if(!bulunan && firebaseConfigVarMi()){
-    err.textContent='Kullanici bilgileri kontrol ediliyor...';
-    await firebaseKullanicilariYukle();
-    bulunan=kullaniciBul(ad,sifre,sifreHash);
-  }
-
-  if(!bulunan){err.textContent='Kullanici adi veya sifre hatali';return;}
-  aktifKullanici=normalizeUser({...bulunan,sifreHash:bulunan.sifreHash||sifreHash,sifre:null});
-  err.textContent='';
-  document.getElementById('loginScreen').classList.add('hidden');
-  document.getElementById('headerKullanici').textContent=`${aktifKullanici.ad} · ${rolAdi(aktifKullanici.rol)}`;
-  homeGridGuncelle();
-  if(aktifKullanici.sifreDegisti===false){showToast('Guvenlik icin varsayilan sifreyi degistirin',false,true);}
-  fbBaglanOtomatik();
-}
-
-function kullaniciBul(ad,sifre,sifreHash){
-  return kullanicilar.find(k=>{
-    const u=normalizeUser(k);
-    return (u.ad||'').toLowerCase()===ad.toLowerCase() && ((u.sifreHash&&u.sifreHash===sifreHash)||(!u.sifreHash&&u.sifre===sifre));
-  });
-}
-
 function rolAdi(rol){
   return rol==='admin'?'👑 Admin':rol==='sef'?'🎩 Şef':'🏪 Tezgahtar';
 }
@@ -716,27 +647,6 @@ function homeGridGuncelle(){
   });
 }
 
-function loginEkraniniTamamenKaldir(){
-  const login=document.getElementById('loginScreen');
-  if(login)login.remove();
-}
-
-function otomatikGiris(){
-  loginEkraniniTamamenKaldir();
-  loadKullanicilar();
-  aktifKullanici=normalizeUser({ad:'admin',sifreHash:DEFAULT_PASS_HASH,rol:'admin',sifreDegisti:true});
-  const login=document.getElementById('loginScreen');
-  if(login)login.classList.add('hidden');
-  const header=document.getElementById('headerKullanici');
-  if(header)header.textContent='admin · '+rolAdi('admin');
-  homeGridGuncelle();
-  fbBaglanOtomatik();
-}
-
-function cikis(){
-  otomatikGiris();
-  goHome();
-}
 
 async function kullaniciEkle(){
   if(!requireYetki('ayarlar'))return;
@@ -2321,26 +2231,12 @@ function eskiCacheTemizle(){
   if('caches' in window){caches.keys().then(keys=>keys.forEach(k=>caches.delete(k))).catch(()=>{});}
 }
 
-function loginInputlariHazirla(){
-  ['loginKullanici','loginSifre'].forEach(id=>{
-    const el=document.getElementById(id);
-    if(!el)return;
-    el.disabled=false;
-    el.readOnly=false;
-    el.removeAttribute('disabled');
-    el.removeAttribute('readonly');
-    el.style.pointerEvents='auto';
-    el.addEventListener('touchend',()=>setTimeout(()=>el.focus(),0),{passive:true});
-    el.addEventListener('click',()=>el.focus());
-  });
-}
-
 // ===== INIT =====
 eskiCacheTemizle();
-loginInputlariHazirla();
-otomatikGiris();
-// Eski PIN tabanlı storage'ı temizle
-localStorage.removeItem('app_pin');
+loadKullanicilar();
+aktifKullanici=normalizeUser({ad:'admin',sifreHash:DEFAULT_PASS_HASH,rol:'admin',sifreDegisti:true});
+homeGridGuncelle();
+fbBaglanOtomatik();
 loadLocal();
 loadKullanicilar();
 renderKullaniciListesi();
