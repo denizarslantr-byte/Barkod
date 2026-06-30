@@ -24,7 +24,7 @@
 body{font-family:var(--sans);background:var(--bg);color:var(--text);min-height:100vh;max-width:480px;margin:0 auto;}
 
 /* LOGIN */
-#loginScreen{position:fixed;inset:0;background:var(--bg);z-index:9999;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:32px 24px;max-width:480px;margin:0 auto;touch-action:manipulation;}
+#loginScreen{display:none!important;}
 #loginScreen.hidden{display:none;}
 .login-logo{width:72px;height:72px;background:var(--accent);border-radius:18px;display:flex;align-items:center;justify-content:center;font-size:36px;margin-bottom:20px;}
 .login-title{font-size:24px;font-weight:700;margin-bottom:6px;text-align:center;}
@@ -714,12 +714,19 @@ function homeGridGuncelle(){
   });
 }
 
+function otomatikGiris(){
+  loadKullanicilar();
+  aktifKullanici=normalizeUser({ad:'admin',sifreHash:DEFAULT_PASS_HASH,rol:'admin',sifreDegisti:true});
+  const login=document.getElementById('loginScreen');
+  if(login)login.classList.add('hidden');
+  const header=document.getElementById('headerKullanici');
+  if(header)header.textContent='admin · '+rolAdi('admin');
+  homeGridGuncelle();
+  fbBaglanOtomatik();
+}
+
 function cikis(){
-  aktifKullanici = null;
-  document.getElementById('loginScreen').classList.remove('hidden');
-  document.getElementById('loginKullanici').value='';
-  document.getElementById('loginSifre').value='';
-  document.getElementById('loginError').textContent='';
+  otomatikGiris();
   goHome();
 }
 
@@ -2318,6 +2325,7 @@ function loginInputlariHazirla(){
 
 // ===== INIT =====
 loginInputlariHazirla();
+otomatikGiris();
 // Eski PIN tabanlı storage'ı temizle
 localStorage.removeItem('app_pin');
 loadLocal();
