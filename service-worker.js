@@ -1,4 +1,4 @@
-﻿const CACHE_NAME = 'barkod-sayim-pwa-v6';
+﻿const CACHE_NAME = 'barkod-sayim-pwa-v7';
 const CORE_ASSETS = [
   './',
   './index.html',
@@ -40,6 +40,7 @@ self.addEventListener('fetch', event => {
     }).catch(() => caches.match(event.request)))
   );
 });
+
 
 
 
