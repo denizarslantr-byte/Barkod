@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>Barkod Sayım</title>
-<meta name="app-version" content="firebase-defaults-v8">
+<meta name="app-version" content="firebase-defaults-v9">
 <link rel="manifest" href="manifest.json">
 <meta name="theme-color" content="#0f1117">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -1735,19 +1735,25 @@ function iosZXingScan(video,fl,onDecoded,flashVe){
       canvas.height=h;
       try{
         ctx.drawImage(video,0,0,w,h);
-        const imgData=ctx.getImageData(0,0,w,h);
-        const rgba=imgData.data;
-        const len=rgba.length/4;
-        const gray=new Uint8ClampedArray(len);
-        
-        // Yuksek performansli RGBA -> Grayscale donusumu
-        for(let i=0;i<len;i++){
-          gray[i]=(rgba[i*4]*19595+rgba[i*4+1]*38469+rgba[i*4+2]*7472)>>16;
+        let lum;
+        if (typeof ZXing.HTMLCanvasElementLuminanceSource !== 'undefined') {
+          lum = new ZXing.HTMLCanvasElementLuminanceSource(canvas);
+        } else {
+          const imgData = ctx.getImageData(0,0,w,h);
+          const rgba = imgData.data;
+          const len = rgba.length / 4;
+          const argb = new Int32Array(len);
+          for(let i=0; i<len; i++){
+            const r = rgba[i*4];
+            const g = rgba[i*4+1];
+            const b = rgba[i*4+2];
+            const a = rgba[i*4+3];
+            argb[i] = (a << 24) | (r << 16) | (g << 8) | b;
+          }
+          lum = new ZXing.RGBLuminanceSource(w, h, argb);
         }
-        
-        const lum=new ZXing.RGBLuminanceSource(gray,w,h);
-        const bmp=new ZXing.BinaryBitmap(new ZXing.HybridBinarizer(lum));
-        const res=reader.decode(bmp);
+        const bmp = new ZXing.BinaryBitmap(new ZXing.HybridBinarizer(lum));
+        const res = reader.decode(bmp);
         if(res&&res.getText()){
           okuma=true;
           flashVe(()=>onDecoded(res.getText()));
