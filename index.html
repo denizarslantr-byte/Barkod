@@ -1668,29 +1668,14 @@ function iosZXingScan(video,fl,onDecoded,flashVe){
 
     let okuma=false;
 
-    if(ZXing.BrowserMultiFormatReader){
-      zxingReader=new ZXing.BrowserMultiFormatReader(hints,250);
-      nativeScanInterval={stop:()=>{try{zxingReader&&zxingReader.reset();}catch(e){}}};
-      zxingReader.decodeFromVideoElementContinuously(video,(result,err)=>{
-        if(!result||okuma)return;
-        okuma=true;
-        flashVe(()=>onDecoded(result.getText()));
-        setTimeout(()=>okuma=false,1500);
-      });
-      return;
-    }
-
     const reader=new ZXing.MultiFormatReader();
     reader.setHints(hints);
     const canvas=document.createElement('canvas');
     const ctx=canvas.getContext('2d',{willReadFrequently:true,alpha:false});
-    let frameCount=0;
 
     nativeScanInterval=setInterval(()=>{
       if(okuma)return;
       if(video.readyState<2||video.videoWidth===0||video.paused)return;
-      frameCount++;
-      if(frameCount%2!==0)return;
       canvas.width=video.videoWidth;
       canvas.height=video.videoHeight;
       try{
@@ -1705,7 +1690,7 @@ function iosZXingScan(video,fl,onDecoded,flashVe){
           setTimeout(()=>okuma=false,1500);
         }
       }catch(e){}
-    },120);
+    },100);
   }catch(e){
     showToast('iOS okuyucu baslatilamadi: '+e.message,true);
   }
