@@ -657,6 +657,33 @@ const ROL_YETKILERI = {
 
 function esc(v){return (v??'').toString().replace(/[&<>'"]/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[m]));}
 function cleanText(v){return (v??'').toString().replace(/[<>]/g,'').trim();}
+function playBeep(type){
+  try{
+    const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+    osc.connect(gain);
+    gain.connect(audioCtx.destination);
+
+    if(type === 'success'){
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(1000, audioCtx.currentTime);
+      gain.gain.setValueAtTime(0.2, audioCtx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.08);
+      osc.start(audioCtx.currentTime);
+      osc.stop(audioCtx.currentTime + 0.08);
+    } else if(type === 'error'){
+      osc.type = 'sawtooth';
+      osc.frequency.setValueAtTime(160, audioCtx.currentTime);
+      gain.gain.setValueAtTime(0.25, audioCtx.currentTime);
+      gain.gain.setValueAtTime(0.01, audioCtx.currentTime + 0.12);
+      gain.gain.setValueAtTime(0.25, audioCtx.currentTime + 0.15);
+      gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.35);
+      osc.start(audioCtx.currentTime);
+      osc.stop(audioCtx.currentTime + 0.35);
+    }
+  }catch(e){}
+}
 async function sha256(text){
   const buf=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(text));
   return Array.from(new Uint8Array(buf)).map(b=>b.toString(16).padStart(2,'0')).join('');
@@ -815,14 +842,16 @@ function loadKullanicilar(){
 // ===== FİYAT SORGU =====
 function fiyatSorgu(){
   const bNo = document.getElementById('fiyatInput').value.trim();
-  if(!bNo){showToast('Barkod girin',true);return;}
-  if(!stokData.length){showToast('Önce Stok sekmesinden veri yükleyin',true);return;}
+  if(!bNo){showToast('Barkod girin',true);playBeep('error');return;}
+  if(!stokData.length){showToast('Önce Stok sekmesinden veri yükleyin',true);playBeep('error');return;}
   const hedef = stokData.find(s=>s.barkodNo.toString().trim()===bNo.toString().trim());
   if(!hedef){
     document.getElementById('fiyatSonuc').style.display='none';
     document.getElementById('fiyatBos').style.display='block';
+    playBeep('error');
     return;
   }
+  playBeep('success');
   const sonuclar = stokData.filter(s=>s.model.toString().trim()===hedef.model.toString().trim());
   document.getElementById('fiyatBos').style.display='none';
   document.getElementById('fiyatSonuc').style.display='block';
@@ -884,6 +913,7 @@ function sepetEkle(){
   };
   sepetUrunler.push(urun);
   inp.value='';inp.focus();
+  playBeep('success');
   if(navigator.vibrate)navigator.vibrate(50);
   renderSepet();
 }
@@ -1138,14 +1168,16 @@ let sorguAktifBno = '';
 
 function sorguYap(){
   const bNo=document.getElementById('sorguInput').value.trim();
-  if(!bNo){showToast('Barkod girin',true);return;}
-  if(!stokData.length){showToast('Önce Stok sekmesinden veri yükleyin',true);return;}
+  if(!bNo){showToast('Barkod girin',true);playBeep('error');return;}
+  if(!stokData.length){showToast('Önce Stok sekmesinden veri yükleyin',true);playBeep('error');return;}
   const hedef=stokData.find(s=>s.barkodNo.toString().trim()===bNo.toString().trim());
   if(!hedef){
     document.getElementById('sorguSonuc').style.display='none';
     document.getElementById('sorguBos').style.display='block';
+    playBeep('error');
     return;
   }
+  playBeep('success');
   sorguSonuclar=stokData.filter(s=>s.model.toString().trim()===hedef.model.toString().trim());
   aktifRenkFiltre=null;
   sorguAktifBno=bNo;
@@ -1484,13 +1516,17 @@ function barkodEkle(){
   // Çift okuma
   if(s.barkodlar.some(b=>b.barkodNo.toString().trim()===bNo.toString().trim())){
     goster(`⚠️ BU BARKOD OKUTULMUŞ — "${bNo}" zaten listede var!`,'var(--warn)','rgba(245,158,11,.12)','rgba(245,158,11,.4)');
-    inp.value='';inp.focus();if(navigator.vibrate)navigator.vibrate([200,100,200,100,200]);
+    inp.value='';inp.focus();
+    playBeep('error');
+    if(navigator.vibrate)navigator.vibrate([200,100,200,100,200]);
     setTimeout(()=>u.style.display='none',3500);return;
   }
   // Harf kontrolü
   if(!GECERLI_BASLAR.includes(bNo.charAt(0).toUpperCase())){
     goster(`❌ YANLIŞ BARKOD — "${bNo}" geçersiz`,'var(--danger)','rgba(248,113,113,.1)','rgba(248,113,113,.4)');
-    inp.value='';inp.focus();if(navigator.vibrate)navigator.vibrate([300,100,300]);
+    inp.value='';inp.focus();
+    playBeep('error');
+    if(navigator.vibrate)navigator.vibrate([300,100,300]);
     setTimeout(()=>u.style.display='none',4000);return;
   }
   // Depoda var mı
@@ -1502,9 +1538,13 @@ function barkodEkle(){
     );
     if(!depodaVar){
       goster(`🚫 BARKOD DEPODA YOK — "${bNo}" ${s.depo} deposunda bulunamadı`,'var(--danger)','rgba(248,113,113,.1)','rgba(248,113,113,.4)');
+      playBeep('error');
       if(navigator.vibrate)navigator.vibrate([200,100,200,100,200]);
       setTimeout(()=>u.style.display='none',5000);
     }
+  }
+  if(depodaVar){
+    playBeep('success');
   }
   s.barkodlar.push({barkodNo:bNo,depo:s.depo,depodaVar});
   inp.value='';inp.focus();
@@ -1676,12 +1716,36 @@ function iosZXingScan(video,fl,onDecoded,flashVe){
     nativeScanInterval=setInterval(()=>{
       if(okuma)return;
       if(video.readyState<2||video.videoWidth===0||video.paused)return;
-      canvas.width=video.videoWidth;
-      canvas.height=video.videoHeight;
+      
+      // Islem yukunu azaltmak icin cozunurlugu maksimum 640px degerine olcekle
+      let w = video.videoWidth;
+      let h = video.videoHeight;
+      const maxDim = 640;
+      if (w > maxDim || h > maxDim) {
+        if (w > h) {
+          h = Math.round((h * maxDim) / w);
+          w = maxDim;
+        } else {
+          w = Math.round((w * maxDim) / h);
+          h = maxDim;
+        }
+      }
+      
+      canvas.width=w;
+      canvas.height=h;
       try{
-        ctx.drawImage(video,0,0,canvas.width,canvas.height);
-        const imgData=ctx.getImageData(0,0,canvas.width,canvas.height);
-        const lum=new ZXing.RGBLuminanceSource(imgData.data,canvas.width,canvas.height);
+        ctx.drawImage(video,0,0,w,h);
+        const imgData=ctx.getImageData(0,0,w,h);
+        const rgba=imgData.data;
+        const len=rgba.length/4;
+        const gray=new Uint8ClampedArray(len);
+        
+        // Yuksek performansli RGBA -> Grayscale donusumu
+        for(let i=0;i<len;i++){
+          gray[i]=(rgba[i*4]*19595+rgba[i*4+1]*38469+rgba[i*4+2]*7472)>>16;
+        }
+        
+        const lum=new ZXing.RGBLuminanceSource(gray,w,h);
         const bmp=new ZXing.BinaryBitmap(new ZXing.HybridBinarizer(lum));
         const res=reader.decode(bmp);
         if(res&&res.getText()){
@@ -1697,26 +1761,7 @@ function iosZXingScan(video,fl,onDecoded,flashVe){
 }
 
 function androidZXing(video,fl,onDecoded,flashVe){
-  if(typeof ZXing==='undefined')return;
-  const hints=new Map();
-  hints.set(ZXing.DecodeHintType.POSSIBLE_FORMATS,[ZXing.BarcodeFormat.EAN_13,ZXing.BarcodeFormat.EAN_8,ZXing.BarcodeFormat.CODE_128,ZXing.BarcodeFormat.CODE_39,ZXing.BarcodeFormat.QR_CODE,ZXing.BarcodeFormat.UPC_A,ZXing.BarcodeFormat.UPC_E,ZXing.BarcodeFormat.ITF]);
-  hints.set(ZXing.DecodeHintType.TRY_HARDER,true);
-  const reader=new ZXing.MultiFormatReader();reader.setHints(hints);
-  const canvas=document.createElement('canvas');
-  const ctx=canvas.getContext('2d',{willReadFrequently:true});
-  let okuma=false;
-  nativeScanInterval=setInterval(()=>{
-    if(video.readyState<2||okuma)return;
-    canvas.width=video.videoWidth;canvas.height=video.videoHeight;
-    ctx.drawImage(video,0,0);
-    try{
-      const id=ctx.getImageData(0,0,canvas.width,canvas.height);
-      const lum=new ZXing.RGBLuminanceSource(id.data,canvas.width,canvas.height);
-      const bmp=new ZXing.BinaryBitmap(new ZXing.HybridBinarizer(lum));
-      const res=reader.decode(bmp);
-      if(res){okuma=true;flashVe(()=>onDecoded(res.getText()));setTimeout(()=>okuma=false,1500);}
-    }catch(e){}
-  },100);
+  iosZXingScan(video,fl,onDecoded,flashVe);
 }
 
 function toggleKamera(){kameraAcik?stopKamera():startKamera();}
@@ -1860,6 +1905,7 @@ function transferBarkodEkle(){
     u.style.display='block';u.textContent=`⚠️ BU BARKOD OKUTULMUŞ — "${bNo}" zaten listede var!`;
     u.style.color='var(--warn)';
     inp.value='';inp.focus();
+    playBeep('error');
     if(navigator.vibrate)navigator.vibrate([200,100,200,100,200]);
     setTimeout(()=>{u.style.display='none';u.style.color='';},3500);return;
   }
@@ -1869,6 +1915,7 @@ function transferBarkodEkle(){
     u.style.display='block';u.textContent=`❌ YANLIŞ BARKOD — "${bNo}" geçersiz (D,K,X,V,Q,T ile başlamalı)`;
     u.style.color='var(--danger)';
     inp.value='';inp.focus();
+    playBeep('error');
     if(navigator.vibrate)navigator.vibrate([300,100,300]);
     setTimeout(()=>{u.style.display='none';u.style.color='';},4000);return;
   }
@@ -1882,6 +1929,7 @@ function transferBarkodEkle(){
       u.style.display='block';u.textContent=`🚫 BARKOD DEPODA YOK — "${bNo}" çıkış deposunda (${t.cikisDepo}) bulunamadı — Eklenmedi!`;
       u.style.color='var(--danger)';
       inp.value='';inp.focus();
+      playBeep('error');
       if(navigator.vibrate)navigator.vibrate([300,100,300,100,300]);
       setTimeout(()=>{u.style.display='none';u.style.color='';},5000);return;
     }
@@ -1889,6 +1937,7 @@ function transferBarkodEkle(){
   u.style.display='none';u.style.color='';
   t.barkodlar.push({barkodNo:bNo,cikisDepo:t.cikisDepo,girisDepo:t.girisDepo});
   inp.value='';inp.focus();
+  playBeep('success');
   saveLocalTransfer();renderTransferBarkodList();
   if(fbDb)fbDb.collection('transferler').doc(t.id).set(t);
   if(navigator.vibrate)navigator.vibrate(50);
