@@ -2,27 +2,35 @@
 <html lang="tr">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Barkod Sayım</title>
 <meta name="app-version" content="firebase-defaults-v9">
 <link rel="manifest" href="manifest.json">
 <meta name="theme-color" content="#0f1117">
 <meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Barkod Sayım">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<link rel="apple-touch-icon" href="icons/icon-192.png">
-<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-<script src="https://unpkg.com/@zxing/library@0.19.1/umd/index.min.js"></script>
+<meta name="format-detection" content="telephone=no">
+<meta name="color-scheme" content="dark">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<link rel="icon" type="image/png" href="icons/icon-192.png">
+<script src="vendor/xlsx.full.min.js"></script>
+<script src="vendor/zxing.min.js"></script>
 <style>
-@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap');
 :root{
   --bg:#0f1117;--surface:#1a1d27;--surface2:#232636;--border:#2e3248;
   --accent:#4ade80;--accent2:#22d3ee;--warn:#f59e0b;--danger:#f87171;
   --purple:#a78bfa;--orange:#fb923c;
   --text:#e2e8f0;--muted:#64748b;
-  --mono:'IBM Plex Mono',monospace;--sans:'IBM Plex Sans',sans-serif;
+  --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,'Roboto Mono',monospace;--sans:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif;
+  --sat:env(safe-area-inset-top,0px);--sab:env(safe-area-inset-bottom,0px);--sal:env(safe-area-inset-left,0px);--sar:env(safe-area-inset-right,0px);
 }
 *{box-sizing:border-box;margin:0;padding:0;}
-body{font-family:var(--sans);background:var(--bg);color:var(--text);min-height:100vh;max-width:480px;margin:0 auto;}
+html{-webkit-text-size-adjust:100%;text-size-adjust:100%;background:var(--bg);}
+body{font-family:var(--sans);background:var(--bg);color:var(--text);min-height:100vh;min-height:100dvh;max-width:480px;margin:0 auto;padding-left:var(--sal);padding-right:var(--sar);padding-bottom:var(--sab);-webkit-tap-highlight-color:transparent;overscroll-behavior-y:none;-webkit-touch-callout:none;}
+button,.home-card,.depo-item,.share-btn,.back-btn{touch-action:manipulation;-webkit-user-select:none;user-select:none;}
+input,select,textarea{-webkit-user-select:text;user-select:text;-webkit-appearance:none;appearance:none;}
 
 /* LOGIN */
 #loginScreen{display:none!important;visibility:hidden!important;pointer-events:none!important;}
@@ -40,7 +48,7 @@ body{font-family:var(--sans);background:var(--bg);color:var(--text);min-height:1
 .pin-hint{font-size:11px;color:var(--muted);margin-top:8px;text-align:center;}
 
 /* HEADER */
-.app-header{background:var(--surface);border-bottom:1px solid var(--border);padding:10px 14px;display:flex;align-items:center;gap:10px;position:sticky;top:0;z-index:100;}
+.app-header{background:var(--surface);border-bottom:1px solid var(--border);padding:calc(10px + var(--sat)) 14px 10px;display:flex;align-items:center;gap:10px;position:sticky;top:0;z-index:100;}
 .app-logo{width:28px;height:28px;background:var(--accent);border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:14px;}
 .app-title{font-size:14px;font-weight:700;}
 .header-right{margin-left:auto;display:flex;align-items:center;gap:8px;}
@@ -143,6 +151,25 @@ body{font-family:var(--sans);background:var(--bg);color:var(--text);min-height:1
 .qr-wrap>div>div+div{display:none!important;}
 .qr-wrap span{display:none!important;}
 
+/* MOBILE: dokunma hedefi, iOS odak zoom'unu engelle (>=16px) */
+.btn{min-height:40px;}
+.btn-sm{min-height:34px;}
+.back-btn{min-height:38px;padding:8px 14px;}
+.logout-btn{min-height:30px;padding:5px 10px;}
+.barkod-del{min-height:34px;min-width:38px;}
+.modal-close{width:34px;height:34px;}
+.input,.edit-input,.scan-input,select.input{font-size:16px;min-height:42px;}
+.edit-input{min-height:38px;}
+.modal{padding-bottom:calc(22px + var(--sab));max-height:92vh;max-height:92dvh;-webkit-overflow-scrolling:touch;}
+.toast{bottom:calc(18px + var(--sab));}
+.stok-table th,.stok-table td{white-space:nowrap;}
+.home-card{min-height:96px;justify-content:center;}
+@media (max-width:360px){.home-grid{gap:7px;}.home-card-label{font-size:10px;}}
+@media (prefers-reduced-motion:reduce){*{animation-duration:.01ms!important;transition-duration:.01ms!important;}}
+#installBanner{display:none;margin:0 0 12px;padding:11px 13px;background:rgba(34,211,238,.08);border:1px solid rgba(34,211,238,.3);border-radius:10px;font-size:12px;line-height:1.6;color:var(--text);}
+#installBanner b{color:var(--accent2);}
+#installBanner .ib-row{display:flex;gap:8px;margin-top:8px;}
+
 /* TOAST */
 .toast{position:fixed;bottom:18px;left:50%;transform:translateX(-50%);background:var(--accent);color:#0f1117;padding:8px 16px;border-radius:100px;font-size:12px;font-weight:600;z-index:9999;animation:fadeOut 2.6s ease forwards;white-space:nowrap;max-width:88vw;text-align:center;}
 .toast.error{background:var(--danger);color:white;}
@@ -210,6 +237,7 @@ LOGIN REMOVED -->
 
 <!-- HOME -->
 <div id="page-home" style="padding:14px 12px;">
+  <div id="installBanner"></div>
   <div class="home-grid" id="homeGrid">
     <div class="home-card c-sorgu" id="card-sorgu" onclick="goPage('sorgu')">
       <div class="home-card-icon">🔍</div>
@@ -1621,68 +1649,52 @@ function startNativeKamera(cont,onDecoded){
 
   const flashVe=(cb)=>{fl.style.opacity='1';setTimeout(()=>fl.style.opacity='0',130);cb();};
 
-  if(isIOS()){
-    // ===== iOS: Safari veya Chrome =====
-    // iOS Chrome (CriOS) da Safari engine kullanır — aynı kısıtlamalar
-    // Çözüm: imageCapture + canvas veya direkt video frame
-    const iosConstraints={
-      video:{
-        facingMode:{exact:'environment'}, // exact ile arka kamera zorla
-        width:{ideal:1280},
-        height:{ideal:720},
-      }
-    };
-    // exact facingMode hata verirse ideal ile dene
-    navigator.mediaDevices.getUserMedia(iosConstraints)
-      .catch(()=>navigator.mediaDevices.getUserMedia({video:{facingMode:{ideal:'environment'}}}))
-      .then(stream=>{
-        nativeStream=stream;
-        video.srcObject=stream;
-
-        const baslat=()=>{
-          if(!nativeScanInterval)iosZXingScan(video,fl,onDecoded,flashVe);
-        };
-        video.addEventListener('loadedmetadata',baslat,{once:true});
-        video.addEventListener('playing',baslat,{once:true});
-        video.play().then(baslat).catch(()=>{
-          showToast('Kamera baslatilamadi. iOS kamera iznini kontrol edin.',true);
-        });
-
-        setTimeout(()=>{
-          if(video.readyState>=2&&!nativeScanInterval)baslat();
-        },2000);
-      })
-      .catch(err=>{
-        const msg=err&&err.name==='NotAllowedError'?'Kamera izni kapali: Ayarlar > Safari > Kamera > Izin Ver':'iOS kamerasi acilamadi: '+(err&&err.name?err.name:'izin veya HTTPS sorunu');
-        showToast(msg,true);
-      });
-
-  } else {
-    // ===== Android: BarcodeDetector (hızlı) veya ZXing =====
-    navigator.mediaDevices.getUserMedia({
-      video:{facingMode:{ideal:'environment'},width:{ideal:1280,min:640},height:{ideal:720,min:480},frameRate:{ideal:30}}
-    }).then(stream=>{
-      nativeStream=stream;video.srcObject=stream;video.play().catch(()=>showToast('Kamera baslatilamadi',true));
-      let okuma=false;
-      if(typeof BarcodeDetector!=='undefined'){
-        try{
-          const det=new BarcodeDetector({formats:['ean_13','ean_8','code_128','code_39','qr_code','upc_a','upc_e','itf','codabar']});
-          nativeScanInterval=setInterval(async()=>{
-            if(video.readyState<2||okuma)return;
-            try{
-              const b=await det.detect(video);
-              if(b.length>0){okuma=true;flashVe(()=>onDecoded(b[0].rawValue));setTimeout(()=>okuma=false,1500);}
-            }catch(e){}
-          },80);
-          return;
-        }catch(e){}
-      }
-      // BarcodeDetector yoksa ZXing
-      androidZXing(video,fl,onDecoded,flashVe);
-    }).catch(err=>{
-      showToast('Kamera izni gerekli',true);
-    });
-  }
+  const kameraHata=err=>{
+    const n=err&&err.name;
+    const msg=n==='NotAllowedError'||n==='SecurityError'
+      ?(isIOS()?'Kamera izni kapalı: Ayarlar > Safari > Kamera > İzin Ver':'Kamera izni kapalı: tarayıcı site ayarlarından kamerayı açın')
+      :n==='NotFoundError'||n==='OverconstrainedError'?'Arka kamera bulunamadı'
+      :n==='NotReadableError'?'Kamera başka bir uygulama tarafından kullanılıyor'
+      :'Kamera açılamadı'+(n?': '+n:'');
+    showToast(msg,true);
+  };
+  // Önce arka kamera (ideal); olmazsa herhangi bir kamera
+  const istek=(c)=>navigator.mediaDevices.getUserMedia({video:c,audio:false});
+  istek({facingMode:{ideal:'environment'},width:{ideal:1280},height:{ideal:720},frameRate:{ideal:30}})
+    .catch(()=>istek(true))
+    .then(stream=>{
+      nativeStream=stream;
+      video.srcObject=stream;
+      // Sürekli otomatik odak (destekleyen cihazlarda)
+      try{
+        const tr=stream.getVideoTracks()[0];
+        const caps=tr.getCapabilities?tr.getCapabilities():{};
+        if(caps.focusMode&&caps.focusMode.includes('continuous'))tr.applyConstraints({advanced:[{focusMode:'continuous'}]}).catch(()=>{});
+      }catch(e){}
+      const baslat=()=>{
+        if(nativeScanInterval)return;
+        if(typeof BarcodeDetector!=='undefined'){
+          try{
+            const det=new BarcodeDetector({formats:['ean_13','ean_8','code_128','code_39','qr_code','upc_a','upc_e','itf','codabar']});
+            let okuma=false;
+            nativeScanInterval=setInterval(async()=>{
+              if(video.readyState<2||okuma)return;
+              try{
+                const r=await det.detect(video);
+                if(r.length>0){okuma=true;flashVe(()=>onDecoded(r[0].rawValue));setTimeout(()=>okuma=false,1500);}
+              }catch(e){}
+            },80);
+            return;
+          }catch(e){}
+        }
+        iosZXingScan(video,fl,onDecoded,flashVe);
+      };
+      video.addEventListener('loadedmetadata',baslat,{once:true});
+      video.addEventListener('playing',baslat,{once:true});
+      video.play().then(baslat).catch(()=>showToast('Kamera başlatılamadı. Ekrana dokunup tekrar deneyin.',true));
+      setTimeout(()=>{if(video.readyState>=2&&!nativeScanInterval)baslat();},2000);
+    })
+    .catch(kameraHata);
 }
 
 function iosZXingScan(video,fl,onDecoded,flashVe){
@@ -2035,13 +2047,33 @@ function doExport(){
   }
   const ws=XLSX.utils.aoa_to_sheet(data);
   const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,'Veri');
-  XLSX.writeFile(wb,`${k.ad.replace(/\s+/g,'_')}.xlsx`);
-  showToast(`${data.length-1} kayıt indirildi ✓`);
+  const adet=data.length-1;
+  xlsxKaydet(wb,`${(k.ad||'liste').replace(/[\\/:*?"<>|\s]+/g,'_')}.xlsx`).then(()=>showToast(`${adet} kayıt hazır ✓`));
+}
+
+// iOS/Android: dosya paylaşım menüsü (Dosyalara kaydet, WhatsApp, Mail...), olmazsa normal indirme
+async function xlsxKaydet(wb,dosyaAdi){
+  const tip='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
+  const out=XLSX.write(wb,{bookType:'xlsx',type:'array'});
+  const blob=new Blob([out],{type:tip});
+  try{
+    const file=new File([blob],dosyaAdi,{type:tip});
+    if(navigator.canShare&&navigator.canShare({files:[file]})){
+      await navigator.share({files:[file],title:dosyaAdi});
+      return;
+    }
+  }catch(e){
+    if(e&&e.name==='AbortError')return;
+  }
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a');
+  a.href=url;a.download=dosyaAdi;a.style.display='none';
+  document.body.appendChild(a);a.click();
+  setTimeout(()=>{a.remove();URL.revokeObjectURL(url);},4000);
 }
 
 function doWhatsapp(){
   const k=getAktifKayit();if(!k||!k.barkodlar.length){showToast('Veri yok',true);return;}
-  doExport();
   let mesaj='';
   if(aktifPaylasType==='sayim'){
     mesaj=`📋 *${k.ad}*\n📅 ${k.tarih}\n📦 Depo: ${k.depo||'—'}\n🔢 ${k.barkodlar.length} adet\n\n`;
@@ -2050,7 +2082,11 @@ function doWhatsapp(){
     mesaj=`🔄 *${k.ad}*\n📅 ${k.tarih}\n📤 ${k.cikisDepo} → 📥 ${k.girisDepo}\n🔢 ${k.barkodlar.length} adet\n\n`;
     mesaj+=k.barkodlar.map((b,i)=>`${i+1}. ${b.barkodNo} | 📤 ${b.cikisDepo||k.cikisDepo} → 📥 ${b.girisDepo||k.girisDepo}`).join('\n');
   }
-  setTimeout(()=>window.open(`https://wa.me/?text=${encodeURIComponent(mesaj)}`,'_blank'),600);
+  if(mesaj.length>4500){mesaj=mesaj.slice(0,4500)+'\n…(liste kısaltıldı, tamamı için Excel paylaşın)';}
+  // Dokunuş olayı içinde senkron aç: iOS açılır pencere engelleyicisine takılmaz
+  const url=`https://wa.me/?text=${encodeURIComponent(mesaj)}`;
+  const w=window.open(url,'_blank');
+  if(!w)window.location.href=url;
 }
 
 // ===== DÜZENLE =====
@@ -2131,8 +2167,8 @@ async function firebaseHazirlaSessiz(){
   alanlaraFirebaseConfigYaz(cfg);
   if(!cfg||!cfg.apiKey||!cfg.projectId||!cfg.appId)return false;
   try{
-    await loadScriptOnce('https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js');
-    await loadScriptOnce('https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js');
+    await loadScriptOnce('vendor/firebase-app-compat.js');
+    await loadScriptOnce('vendor/firebase-firestore-compat.js');
     if(!firebase.apps.length){
       firebase.initializeApp({apiKey:cfg.apiKey,authDomain:`${cfg.projectId}.firebaseapp.com`,projectId:cfg.projectId,storageBucket:`${cfg.projectId}.appspot.com`,appId:cfg.appId});
     }
@@ -2155,40 +2191,70 @@ async function firebaseKullanicilariYukle(){
   return false;
 }
 
+// Bir kez tanımlanınca (localStorage 'fb_cfg') uygulama her açılışta, internet geri geldiğinde
+// ve arka plandan dönüşte kendiliğinden bağlanır; kopuk kalırsa aralıklı yeniden dener.
+let fbDinleniyor=false, fbBaglaniyor=false, fbDeneme=0, fbRetryTimer=null, fbElleKesildi=false;
 function fbBaglanOtomatik(){
+  if(fbElleKesildi||fbDinleniyor||fbBaglaniyor)return;
   const c=getFirebaseConfig();
   alanlaraFirebaseConfigYaz(c);
-  if(c)fbBaglan();
+  if(c)fbBaglan(true);
 }
+function fbTekrarPlanla(){
+  clearTimeout(fbRetryTimer);
+  if(fbElleKesildi||fbDinleniyor)return;
+  const bekle=Math.min(5000*Math.pow(2,fbDeneme++),60000);
+  fbRetryTimer=setTimeout(fbBaglanOtomatik,bekle);
+}
+window.addEventListener('online',()=>{fbDeneme=0;fbBaglanOtomatik();});
+document.addEventListener('visibilitychange',()=>{if(!document.hidden){fbDeneme=0;fbBaglanOtomatik();}});
 
-async function fbBaglan(){
+async function fbBaglan(sessiz){
+  if(sessiz!==true){fbElleKesildi=false;fbDinleniyor=false;}
+  if(fbBaglaniyor)return;
   alanlaraFirebaseConfigYaz(getFirebaseConfig());
   const apiKey=document.getElementById('fbApiKey').value.trim();
   const projectId=document.getElementById('fbProjectId').value.trim();
   const appId=document.getElementById('fbAppId').value.trim();
   if(!apiKey||!projectId||!appId)return;
+  // Bilgileri hemen kaydet: bağlantı o an kurulamasa bile bir daha girilmesin
+  try{localStorage.setItem('fb_cfg',JSON.stringify({apiKey,projectId,appId}));}catch(e){}
+  fbBaglaniyor=true;
   try{
-    await loadScriptOnce('https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js');
-    await loadScriptOnce('https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js');
-    fbInit(apiKey,projectId,appId);
-  }catch(e){fbBagliGoster(false);showToast('Firebase kutuphanesi yuklenemedi: '+e.message,true);}
+    await loadScriptOnce('vendor/firebase-app-compat.js');
+    await loadScriptOnce('vendor/firebase-firestore-compat.js');
+    fbInit(apiKey,projectId,appId,sessiz===true);
+  }catch(e){
+    fbBaglaniyor=false;fbBagliGoster(false);
+    if(sessiz!==true)showToast('Firebase kutuphanesi yuklenemedi: '+e.message,true);
+    fbTekrarPlanla();
+  }
 }
 
-function fbInit(apiKey,projectId,appId){
+function fbInit(apiKey,projectId,appId,sessiz){
   try{
     const cfg={apiKey,authDomain:`${projectId}.firebaseapp.com`,projectId,storageBucket:`${projectId}.appspot.com`,appId};
     if(!firebase.apps.length)firebase.initializeApp(cfg);
     fbDb=firebase.firestore();
     fbDb.collection('_ping').doc('p').set({t:Date.now()}).then(()=>{
+      fbBaglaniyor=false;fbDeneme=0;
       fbBagliGoster(true);
       localStorage.setItem('fb_cfg',JSON.stringify({apiKey,projectId,appId}));
-      fbDinle();
+      if(!fbDinleniyor){fbDinleniyor=true;fbDinle();}
       // PIN senkronize et
       fbDb.collection('ayarlar').doc('pin').get().then(d=>{
         if(d.exists){const p=d.data().pin;if(p&&p!==localStorage.getItem('app_pin'))localStorage.setItem('app_pin',p);}
       });
-    }).catch(err=>{fbBagliGoster(false);showToast('Firebase hatası: '+err.message,true);});
-  }catch(e){showToast('Firebase başlatılamadı: '+e.message,true);}
+    }).catch(err=>{
+      fbBaglaniyor=false;fbBagliGoster(false);
+      if(!sessiz)showToast('Firebase hatası: '+err.message,true);
+      fbTekrarPlanla();
+    });
+  }catch(e){
+    fbBaglaniyor=false;
+    if(!sessiz)showToast('Firebase başlatılamadı: '+e.message,true);
+    fbTekrarPlanla();
+  }
 }
 
 function fbDinle(){
@@ -2236,7 +2302,7 @@ function fbDinle(){
   });
 }
 
-function fbKes(){fbDb=null;fbBagliGoster(false);localStorage.removeItem('fb_cfg');alanlaraFirebaseConfigYaz(DEFAULT_FIREBASE_CONFIG);showToast('Firebase kesildi');}
+function fbKes(){fbElleKesildi=true;fbDinleniyor=false;clearTimeout(fbRetryTimer);fbDb=null;fbBagliGoster(false);localStorage.removeItem('fb_cfg');alanlaraFirebaseConfigYaz(DEFAULT_FIREBASE_CONFIG);showToast('Firebase kesildi');}
 
 function fbBagliGoster(b){
   document.getElementById('fbDot').className=b?'dot-on':'dot-off';
@@ -2352,11 +2418,41 @@ document.querySelectorAll('.modal-overlay').forEach(ov=>{
 
 
 // ===== PWA =====
+document.addEventListener('visibilitychange',()=>{
+  if(document.hidden){
+    try{stopKamera();stopTransferKamera();stopSorguKamera();stopFiyatKamera();stopSepetKamera();}catch(e){}
+  }
+});
 if('serviceWorker' in navigator){
   window.addEventListener('load',()=>navigator.serviceWorker.register('./service-worker.js').catch(()=>{}));
 }
 let deferredInstallPrompt=null;
-window.addEventListener('beforeinstallprompt',e=>{e.preventDefault();deferredInstallPrompt=e;showToast('Telefona yüklemek için tarayıcı menüsünden Ana ekrana ekle seçin');});
+function standaloneMi(){return window.matchMedia('(display-mode: standalone)').matches||window.navigator.standalone===true;}
+function installBannerGoster(html){
+  const el=document.getElementById('installBanner');
+  if(!el||standaloneMi())return;
+  try{if(localStorage.getItem('bs_install_gizle')==='1')return;}catch(e){}
+  el.innerHTML=html;el.style.display='block';
+}
+function installBannerGizle(kalici){
+  const el=document.getElementById('installBanner');if(el)el.style.display='none';
+  if(kalici){try{localStorage.setItem('bs_install_gizle','1');}catch(e){}}
+}
+window.addEventListener('beforeinstallprompt',e=>{
+  e.preventDefault();deferredInstallPrompt=e;
+  installBannerGoster('<b>📲 Uygulamayı yükle</b><br>Ana ekrandan tam ekran, çevrimdışı kullanın.<div class="ib-row"><button class="btn btn-primary btn-sm" onclick="androidYukle()">Yükle</button><button class="btn btn-secondary btn-sm" onclick="installBannerGizle(true)">Sonra</button></div>');
+});
+window.addEventListener('appinstalled',()=>{deferredInstallPrompt=null;installBannerGizle(true);});
+async function androidYukle(){
+  if(!deferredInstallPrompt)return;
+  deferredInstallPrompt.prompt();
+  try{await deferredInstallPrompt.userChoice;}catch(e){}
+  deferredInstallPrompt=null;installBannerGizle(false);
+}
+// iPhone/iPad: otomatik yükleme penceresi yok, yönerge göster
+if(isIOS()&&!standaloneMi()){
+  installBannerGoster('<b>📲 iPhone\'a yükle</b><br>Safari\'de alttaki <b>Paylaş</b> (⬆️) düğmesine dokunun, ardından <b>Ana Ekrana Ekle</b> seçin.<div class="ib-row"><button class="btn btn-secondary btn-sm" onclick="installBannerGizle(true)">Tamam, anladım</button></div>');
+}
 
 function eskiCacheTemizle(){
   if('caches' in window){caches.keys().then(keys=>keys.forEach(k=>caches.delete(k))).catch(()=>{});}
@@ -2377,7 +2473,6 @@ function loginInputlariHazirla(){
 }
 
 // ===== INIT =====
-eskiCacheTemizle();
 loginInputlariHazirla();
 otomatikGiris();
 // Eski PIN tabanlı storage'ı temizle
